@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>DeliciArte da Janinha - Personalize seu Bolo</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<style>
+* { box-sizing: border-box; }
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: 'Montserrat', sans-serif;
+  background-color: #ff8ca3;
+  background-image: radial-gradient(#ffffff 20%, transparent 20%);
+  background-size: 18px 18px;
+}
+.brand-font { font-family: 'Great Vibes', cursive; }
+.glass {
+  background: rgba(255, 245, 247, 0.96);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-right: 2px solid rgba(229, 168, 35, 0.4);
+}
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.btn-option { transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; user-select: none; }
+.btn-option:active { transform: scale(0.96); }
+.loader {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: #8C6239;
+  font-size: 14px;
+  z-index: 20;
+  transition: opacity 0.5s;
+}
+.loader-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin: 0 3px;
+  border-radius: 50%;
+  background: #D9A05B;
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+.loader-dot:nth-child(1) { animation-delay: -0.32s; }
+.loader-dot:nth-child(2) { animation-delay: -0.16s; }
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1); }
+}
+#canvas-container canvas { display: block; width: 100% !important; height: 100% !important; }
+.btn-active {
+  border-color: #e5a823 !important;
+  background-color: #fffdf5 !important;
+  box-shadow: 0 0 0 3px rgba(229, 168, 35, 0.35);
+}
+.cake-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 -4px 6px rgba(0,0,0,0.15), 0 4px 8px rgba(0,0,0,0.1);
+}
+.cake-thumb-branca { background: linear-gradient(135deg, #FFF9E6, #F3E5AB); border: 3px solid #E6D498; }
+.cake-thumb-mista { background: linear-gradient(135deg, #FFF9E6 50%, #7B4A2B 50%); border: 3px solid #A87654; }
+.cake-thumb-chocolate { background: linear-gradient(135deg, #7B4A2B, #4A2E1B); border: 3px solid #362012; }
+.cake-thumb-baunilha { background: linear-gradient(135deg, #FFFDE8, #EEDC82); border: 3px solid #D4AF37; }
+.cake-thumb-amanteigada { background: linear-gradient(135deg, #FFF3CD, #E2B96F); border: 3px solid #C59B27; }
+</style>
+</head>
+<body class="w-full h-full flex flex-col md:flex-row text-gray-800 select-none">
+
+<div id="controlPanel" class="w-full h-[55vh] md:h-full md:w-1/3 p-4 md:p-6 overflow-y-auto no-scrollbar glass z-20 flex flex-col gap-4 shadow-2xl order-2 md:order-1 border-r border-[#e5a823]/30">
+
+  <div class="flex flex-col items-center justify-center pt-2 pb-1">
+    <div class="relative w-full max-w-[280px] bg-[#2b0c0e] rounded-3xl p-3 border-2 border-[#e5a823] shadow-xl text-center flex flex-col items-center">
+      <div class="w-10 h-10 mb-1 flex items-center justify-center text-[#e5a823]">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-8 h-8">
+          <path d="M6 13.8L12 3l6 10.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M12 3v18" stroke-linecap="round"/>
+          <path d="M8 8h8" stroke-linecap="round"/>
+          <path d="M9 18h6" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h1 class="brand-font text-3xl md:text-4xl text-[#e5a823] drop-shadow-md leading-none mb-1">DeliciArte</h1>
+      <p class="brand-font text-xl text-[#f5d77f] leading-none mb-2">da Janinha</p>
+      <div class="bg-[#e5a823] text-[#2b0c0e] px-4 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-widest shadow-sm border border-amber-200">Doces e Salgados</div>
+    </div>
+  </div>
+
+  <div class="space-y-2 p-3.5 md:p-4 bg-white/80 rounded-2xl border border-amber-200/60 shadow-sm">
+    <div class="flex justify-between items-center">
+      <label for="sizeInput" class="block text-xs md:text-sm font-bold text-[#3b1810] uppercase tracking-wide">Tamanho em Quilogramas (KG)</label>
+      <span class="text-xs text-[#4a191b] font-bold">1kg a 10kg</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <input type="number" id="sizeInput" min="1" max="10" value="1" step="0.5" class="w-full py-2.5 px-3 rounded-xl border-2 border-amber-200 bg-white text-base font-bold text-[#2b0c0e] focus:outline-none focus:border-[#e5a823] shadow-inner text-center">
+      <span class="font-bold text-sm text-[#4a191b] pr-2">KG</span>
+    </div>
+  </div>
+
+  <div class="space-y-3 p-3.5 md:p-4 bg-white/80 rounded-2xl border border-amber-200/60 shadow-sm">
+    <label class="block text-xs md:text-sm font-bold text-[#3b1810] uppercase tracking-wide">Tipo de Massa</label>
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+      <button id="btn-massa-branca" class="btn-option py-2.5 px-2 rounded-2xl bg-white border-2 border-amber-100 flex flex-col items-center gap-1 hover:border-[#e5a823] transition-all group">
+        <div class="cake-thumb cake-thumb-branca group-hover:scale-105 transition-transform"><span class="text-xs">🧁</span></div>
+        <span class="font-bold text-xs text-[#2b0c0e]">Branca</span>
+      </button>
+      <button id="btn-massa-mista" class="btn-option py-2.5 px-2 rounded-2xl bg-white border-2 border-amber-100 flex flex-col items-center gap-1 hover:border-[#e5a823] transition-all group">
+        <div class="cake-thumb cake-thumb-mista group-hover:scale-105 transition-transform"><span class="text-xs">🍰</span></div>
+        <span class="font-bold text-xs text-[#2b0c0e]">Mista</span>
+      </button>
+      <button id="btn-massa-chocolate" class="btn-option py-2.5 px-2 rounded-2xl bg-white border-2 border-amber-100 flex flex-col items-center gap-1 hover:border-[#e5a823] transition-all group">
+        <div class="cake-thumb cake-thumb-chocolate group-hover:scale-105 transition-transform"><span class="text-xs">🍫</span></div>
+        <span class="font-bold text-xs text-[#2b0c0e]">Chocolate</span>
+      </button>
+      <button id="btn-massa-baunilha" class="btn-option py-2.5 px-2 rounded-2xl bg-white border-2 border-amber-100 flex flex-col items-center gap-1 hover:border-[#e5a823] transition-all group">
+        <div class="cake-thumb cake-thumb-baunilha group-hover:scale-105 transition-transform"><span class="text-xs">✨</span></div>
+        <span class="font-bold text-xs text-[#2b0c0e]">Baunilha</span>
+      </button>
+      <button id="btn-massa-amanteigada" class="btn-option py-2.5 px-2 rounded-2xl bg-white border-2 border-amber-100 flex flex-col items-center gap-1 hover:border-[#e5a823] transition-all group col-span-2 md:col-span-1">
+        <div class="cake-thumb cake-thumb-amanteigada group-hover:scale-105 transition-transform"><span class="text-xs">🧈</span></div>
+        <span class="font-bold text-xs text-[#2b0c0e]">Amanteigada</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="space-y-3 p-3.5 md:p-4 bg-white/80 rounded-2xl border border-amber-200/60 shadow-sm">
+    <div class="flex justify-between items-center">
+      <label class="block text-xs md:text-sm font-bold text-[#3b1810] uppercase tracking-wide">Recheio(s)</label>
+      <span id="recheioBadge" class="text-[10px] bg-amber-50 text-[#2b0c0e] font-bold px-2 py-0.5 rounded-full border border-amber-200">1 Recheio</span>
+    </div>
+    <div id="singleFillingContainer">
+      <select id="singleRecheioSelect" class="w-full py-2.5 px-3 rounded-xl border-2 border-amber-200 bg-white text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#e5a823] shadow-sm">
+        <option value="none">Sem Recheio</option>
+        <optgroup label="Recheios Tradicionais">
+          <option value="brigadeiro">Brigadeiro</option>
+          <option value="brigadeiro_branco">Brigadeiro Branco</option>
+          <option value="doce_de_leite">Doce de Leite</option>
+          <option value="beijinho">Beijinho</option>
+          <option value="morango">Morango</option>
+          <option value="chocolate_amargo">Chocolate Amargo</option>
+          <option value="ganache">Ganache</option>
+          <option value="ninho">Ninho</option>
+          <option value="limao">Limão</option>
+          <option value="maracuja">Maracujá</option>
+        </optgroup>
+        <optgroup label="Recheios Gourmet">
+          <option value="ninho_morango">Ninho com Morango</option>
+          <option value="ninho_nutella">Ninho com Nutella</option>
+          <option value="brigadeiro_morango">Brigadeiro & Morango</option>
+        </optgroup>
+      </select>
+    </div>
+    <div id="doubleFillingContainer" class="hidden space-y-3">
+      <div>
+        <label for="selectRecheio1" class="block text-xs font-semibold text-[#4a191b] mb-1">1º Recheio (Camada Inferior)</label>
+        <select id="selectRecheio1" class="w-full py-2.5 px-3 rounded-xl border-2 border-amber-200 bg-white text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#e5a823] shadow-sm">
+          <option value="none">Nenhum</option>
+          <option value="brigadeiro">Brigadeiro</option>
+          <option value="brigadeiro_branco">Brigadeiro Branco</option>
+          <option value="doce_de_leite">Doce de Leite</option>
+          <option value="beijinho">Beijinho</option>
+          <option value="morango">Morango</option>
+          <option value="chocolate_amargo">Chocolate Amargo</option>
+          <option value="ganache">Ganache</option>
+          <option value="ninho">Ninho</option>
+          <option value="limao">Limão</option>
+          <option value="maracuja">Maracujá</option>
+          <option value="ninho_morango">Ninho com Morango</option>
+          <option value="ninho_nutella">Ninho com Nutella</option>
+          <option value="brigadeiro_morango">Brigadeiro & Morango</option>
+        </select>
+      </div>
+      <div>
+        <label for="selectRecheio2" class="block text-xs font-semibold text-[#4a191b] mb-1">2º Recheio (Camada Superior)</label>
+        <select id="selectRecheio2" class="w-full py-2.5 px-3 rounded-xl border-2 border-amber-200 bg-white text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#e5a823] shadow-sm">
+          <option value="none">Nenhum</option>
+          <option value="brigadeiro">Brigadeiro</option>
+          <option value="brigadeiro_branco">Brigadeiro Branco</option>
+          <option value="doce_de_leite">Doce de Leite</option>
+          <option value="beijinho">Beijinho</option>
+          <option value="morango">Morango</option>
+          <option value="chocolate_amargo">Chocolate Amargo</option>
+          <option value="ganache">Ganache</option>
+          <option value="ninho">Ninho</option>
+          <option value="limao">Limão</option>
+          <option value="maracuja">Maracujá</option>
+          <option value="ninho_morango">Ninho com Morango</option>
+          <option value="ninho_nutella">Ninho com Nutella</option>
+          <option value="brigadeiro_morango">Brigadeiro & Morango</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="space-y-2 p-3.5 md:p-4 bg-white/80 rounded-2xl border border-amber-200/60 shadow-sm">
+    <label class="block text-xs md:text-sm font-bold text-[#3b1810] uppercase tracking-wide">Cobertura</label>
+    <select id="coberturaSelect" class="w-full py-2.5 px-3 rounded-xl border-2 border-amber-200 bg-white text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#e5a823] shadow-sm">
+      <option value="none">Sem Cobertura</option>
+      <option value="chantininho">Chantininho</option>
+      <option value="chocolate">Chocolate</option>
+      <option value="brigadeiro">Brigadeiro</option>
+      <option value="ganache">Ganache</option>
+    </select>
+  </div>
+
+  <div class="space-y-2 p-3.5 md:p-4 bg-white/80 rounded-2xl border border-amber-200/60 shadow-sm">
+    <label class="block text-xs md:text-sm font-bold text-[#3b1810] uppercase tracking-wide">Decoração Adicional</label>
+    <select id="decoracaoSelect" class="w-full py-2.5 px-3 rounded-xl border-2 border-amber-200 bg-white text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#e5a823] shadow-sm">
+      <option value="none">Nenhuma (+ R$ 0,00)</option>
+      <option value="morango">Morango (+ R$ 7,00)</option>
+      <option value="topo_simples">Topo Simples (+ R$ 10,00)</option>
+      <option value="topo_personalizado">Topo Personalizado (A combinar)</option>
+    </select>
+    <div id="temaTopperContainer" class="pt-2 border-t border-amber-200/50 mt-2 space-y-2">
+      <label for="inputTemaTopper" class="block text-xs font-bold text-[#4a191b]">Tema do Topo / Topper</label>
+      <div class="flex gap-2">
+        <input type="text" id="inputTemaTopper" placeholder="Ex: Lorena, Sonic, Unicórnio..." class="flex-1 px-3 py-2 border-2 border-amber-200 rounded-xl text-xs font-medium focus:outline-none focus:border-[#e5a823] bg-white text-gray-800"/>
+        <button id="btnGerarTopper" class="px-3 py-2 bg-[#2b0c0e] text-[#e5a823] font-bold rounded-xl text-xs border border-[#e5a823] hover:bg-[#4a191b] active:scale-95 transition-all shadow-sm flex items-center gap-1 shrink-0">✨ Aplicar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-auto pt-2 pb-1">
+    <button id="btn-finalizar" class="w-full py-3.5 bg-gradient-to-r from-[#4a191b] via-[#2b0c0e] to-[#4a191b] text-[#e5a823] border-2 border-[#e5a823] rounded-2xl font-bold text-base shadow-lg shadow-black/20 hover:shadow-black/30 hover:scale-[1.01] active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-2">
+      <span>Finalizar Pedido</span>
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 fill-current" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd" />
+      </svg>
+    </button>
+  </div>
+</div>
+
+<div class="w-full h-[45vh] md:h-full md:w-2/3 relative bg-[#EFE3D3] order-1 md:order-2 overflow-hidden" id="canvas-container" style="touch-action: none;">
+  
+  <!-- Avatar da Janinha posicionado com segurança via HTML (sem travar o WebGL) -->
+  <div id="janinhaAvatarContainer" class="absolute bottom-2 left-3 md:bottom-6 md:left-8 z-10 pointer-events-none flex items-end gap-2 transition-all duration-300">
+    <div class="relative group">
+      <!-- Balão de Fala / Anotações -->
+      <div id="janinhaSpeechBubble" class="absolute -top-12 left-12 bg-white/95 text-[#2b0c0e] font-bold text-[11px] md:text-xs px-3 py-1.5 rounded-2xl shadow-lg border-2 border-[#e5a823] whitespace-nowrap opacity-0 transition-all duration-300 transform -translate-y-2">
+        <span>Olá! Vamos montar seu bolo? 🎂</span>
+      </div>
+      <!-- Imagem da Janinha -->
+      <img id="janinhaImg" src="https://i.postimg.cc/Jsd2zVV2/jn3d-2.jpg" alt="Janinha Confeiteira" class="w-24 md:w-36 h-auto drop-shadow-xl object-contain transform transition-transform duration-300 hover:scale-105" onerror="this.style.display='none'">
+    </div>
+  </div>
+
+  <div id="loader" class="loader">
+    <div class="mb-2">
+      <span class="loader-dot"></span>
+      <span class="loader-dot"></span>
+      <span class="loader-dot"></span>
+    </div>
+    <div class="text-xs font-semibold text-[#8C6239]">Carregando Confeitaria 3D...</div>
+  </div>
+
+  <div id="hint" class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-[#F5EBE0]/90 text-[#6B4B27] border border-[#D4A373]/50 backdrop-blur px-4 py-2 rounded-full text-xs font-bold shadow-md pointer-events-none transition-opacity duration-500 opacity-0 z-10">
+    👆 Arraste para visualizar o bolo de outros ângulos
+  </div>
+</div>
+
+<div id="orderModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+  <div class="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl transform scale-95 transition-transform duration-300 border-2 border-[#e5a823] max-h-[90vh] overflow-y-auto no-scrollbar">
+    
+    <!-- Step 1: Resumo do Pedido -->
+    <div id="orderStepSummary">
+      <div class="text-center mb-4">
+        <div class="w-16 h-16 bg-[#2b0c0e] text-[#e5a823] rounded-full flex items-center justify-center mx-auto mb-3 text-2xl border-2 border-[#e5a823]">🎂</div>
+        <h3 class="brand-font text-3xl text-[#2b0c0e]">DeliciArte da Janinha</h3>
+        <p class="text-xs font-bold text-[#4a191b] uppercase tracking-wider">Resumo do seu Pedido</p>
+      </div>
+      <div id="modalSummaryText" class="bg-amber-50/80 rounded-2xl p-4 text-sm text-gray-700 space-y-2 mb-6 border border-amber-200"></div>
+      <div class="flex gap-3">
+        <button id="btn-close-modal" class="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors">Editar</button>
+        <button id="btn-confirm-order" class="flex-1 py-3 bg-[#2b0c0e] text-[#e5a823] rounded-xl font-bold shadow-md hover:bg-[#4a191b] transition-colors border border-[#e5a823]/60">Avançar ➔</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Formulário de Entrega/Contato -->
+    <div id="orderStepForm" class="hidden">
+      <div class="text-center mb-4">
+        <div class="w-12 h-12 bg-[#2b0c0e] text-[#e5a823] rounded-full flex items-center justify-center mx-auto mb-2 text-xl border-2 border-[#e5a823]">📋</div>
+        <h3 class="brand-font text-2xl text-[#2b0c0e]">Dados de Entrega</h3>
+        <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Preencha para concluir seu pedido</p>
+      </div>
+
+      <form id="deliveryForm" class="space-y-3 text-left">
+        <div>
+          <label class="block text-xs font-bold text-[#3b1810] mb-1">Nome Completo *</label>
+          <input type="text" id="custName" required placeholder="Digite seu nome" class="w-full px-3 py-2 rounded-xl border-2 border-amber-200 text-xs font-medium focus:outline-none focus:border-[#e5a823] bg-white">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-[#3b1810] mb-1">Telefone / WhatsApp *</label>
+          <input type="tel" id="custPhone" required placeholder="(00) 00000-0000" class="w-full px-3 py-2 rounded-xl border-2 border-amber-200 text-xs font-medium focus:outline-none focus:border-[#e5a823] bg-white">
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-bold text-[#3b1810] mb-1">Data *</label>
+            <input type="date" id="deliveryDate" required class="w-full px-2.5 py-2 rounded-xl border-2 border-amber-200 text-xs font-medium focus:outline-none focus:border-[#e5a823] bg-white">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-[#3b1810] mb-1">Horário *</label>
+            <input type="time" id="deliveryTime" required class="w-full px-2.5 py-2 rounded-xl border-2 border-amber-200 text-xs font-medium focus:outline-none focus:border-[#e5a823] bg-white">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-[#3b1810] mb-1">Endereço de Entrega / Retirada *</label>
+          <textarea id="custAddress" required rows="2" placeholder="Rua, Número, Bairro ou 'Retirar na loja'" class="w-full px-3 py-2 rounded-xl border-2 border-amber-200 text-xs font-medium focus:outline-none focus:border-[#e5a823] bg-white resize-none"></textarea>
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button type="button" id="btn-back-to-summary" class="w-1/3 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-semibold text-xs hover:bg-gray-200 transition-colors">Voltar</button>
+          <button type="submit" class="w-2/3 py-2.5 bg-[#2b0c0e] text-[#e5a823] rounded-xl font-bold text-xs shadow-md hover:bg-[#4a191b] transition-colors border border-[#e5a823]/60 flex items-center justify-center gap-1">
+            <span>Enviar Pedido</span> 💬
+          </button>
+        </div>
+      </form>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function initApp() {
+  console.log('🎂 Iniciando DeliciArte 3D...');
+
+  if (typeof THREE === 'undefined') {
+    console.error('❌ Three.js não carregou');
+    const loader = document.getElementById('loader');
+    if (loader) loader.innerHTML = '<div class="text-red-600 font-bold">Erro: Three.js não carregou. Recarregue a página.</div>';
+    return;
+  }
+
+  const state = {
+    massa: 'branca',
+    tamanho: 1,
+    recheio1: 'none',
+    recheio2: 'none',
+    cobertura: 'none',
+    decoracao: 'none'
+  };
+
+  const container = document.getElementById('canvas-container');
+  const loader = document.getElementById('loader');
+  const hint = document.getElementById('hint');
+
+  if (!container) {
+    console.error('❌ Container 3D não encontrado');
+    return;
+  }
+
+  const width = container.clientWidth || (window.innerWidth * 0.66);
+  const height = container.clientHeight || window.innerHeight;
+
+  try {
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xD8C4A9);
+
+    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
+    camera.position.set(0, 2.6, 6.2);
+
+    // --- CRIAÇÃO ULTRA DEFENSIVA DE RENDERER WEBGL PARA DISPOSITIVOS MÓVEIS ---
+    let renderer = null;
+    let canvas = document.createElement('canvas');
+
+    const tryCreateRenderer = () => {
+      const optionsList = [
+        { antialias: true, alpha: false, powerPreference: 'high-performance' },
+        { antialias: false, alpha: false, powerPreference: 'default' },
+        { antialias: false, alpha: false, powerPreference: 'low-power', precision: 'mediump' }
+      ];
+
+      for (let opts of optionsList) {
+        try {
+          const r = new THREE.WebGLRenderer({ canvas: canvas, ...opts });
+          if (r) return r;
+        } catch (e) {
+          console.warn('Tentando próximo perfil WebGL...', e);
+        }
+      }
+      return null;
+    };
+
+    renderer = tryCreateRenderer();
+
+    if (!renderer) {
+      throw new Error('WebGL desabilitado ou não suportado neste navegador.');
+    }
+
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    
+    // Desativa sombras pesadas em placas de menor desempenho para evitar crash de GPU
+    try {
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    } catch(e) {
+      renderer.shadowMap.enabled = false;
+    }
+
+    container.appendChild(renderer.domElement);
+
+    // Listener para auto-recuperar se a GPU reiniciar
+    canvas.addEventListener('webglcontextlost', (event) => {
+      event.preventDefault();
+      console.warn('⚠️ Contexto WebGL perdido. Aguardando restauração...');
+    }, false);
+
+    canvas.addEventListener('webglcontextrestored', () => {
+      console.log('🔄 Contexto WebGL restaurado!');
+      updateCake();
+    }, false);
+
+    console.log('✅ Renderer WebGL instanciado com sucesso!');
+
+    let controls = null;
+    if (typeof THREE.OrbitControls !== 'undefined') {
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.maxPolarAngle = Math.PI / 2.1;
+      controls.minDistance = 3;
+      controls.maxDistance = 10;
+      controls.target.set(0, 0.8, 0);
+      controls.update();
+    }
+
+    // Iluminação
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+    dirLight.position.set(5, 8, 5);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 1024;
+    dirLight.shadow.mapSize.height = 1024;
+    scene.add(dirLight);
+
+    const pointLight = new THREE.PointLight(0xffeedd, 0.4);
+    pointLight.position.set(-4, 3, -2);
+    scene.add(pointLight);
+
+    // Cenário (Mesa / Balcão)
+    const tableGroup = new THREE.Group();
+    const tableGeo = new THREE.CylinderGeometry(2.6, 2.7, 0.2, 48);
+    const tableMat = new THREE.MeshStandardMaterial({ color: 0xFFF8F0, roughness: 0.3 });
+    const table = new THREE.Mesh(tableGeo, tableMat);
+    table.position.y = -0.1;
+    table.receiveShadow = true;
+    tableGroup.add(table);
+
+    const plateGeo = new THREE.CylinderGeometry(1.6, 1.4, 0.08, 48);
+    const plateMat = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.2, metalness: 0.1 });
+    const plate = new THREE.Mesh(plateGeo, plateMat);
+    plate.position.y = 0.04;
+    plate.receiveShadow = true;
+    tableGroup.add(plate);
+    scene.add(tableGroup);
+
+    // Grupo do Bolo
+    const cakeGroup = new THREE.Group();
+    scene.add(cakeGroup);
+
+    // Cores dos Ingredientes
+    const massaColors = {
+      branca: 0xFFF9E6,
+      mista: 0xBA8B63,
+      chocolate: 0x4A2E1B,
+      baunilha: 0xFFFDE8,
+      amanteigada: 0xFFF3CD
+    };
+
+    const recheioColors = {
+      none: 0x000000,
+      brigadeiro: 0x3D2314,
+      brigadeiro_branco: 0xFFFDD0,
+      doce_de_leite: 0xC68642,
+      beijinho: 0xFFFAFA,
+      morango: 0xE63946,
+      chocolate_amargo: 0x24140E,
+      ganache: 0x2C1609,
+      ninho: 0xFFFFF0,
+      limao: 0xD4E157,
+      maracuja: 0xFFB703,
+      ninho_morango: 0xE63946,
+      ninho_nutella: 0x3D2314,
+      brigadeiro_morango: 0x800F2F
+    };
+
+    const coberturaColors = {
+      none: null,
+      chantininho: 0xFFFFFF,
+      chocolate: 0x362012,
+      brigadeiro: 0x4A2E1B,
+      ganache: 0x2B1810
+    };
+
+    function buildCake() {
+      // Limpa camadas anteriores
+      while(cakeGroup.children.length > 0) {
+        const obj = cakeGroup.children[0];
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) {
+          if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+          else obj.material.dispose();
+        }
+        cakeGroup.remove(obj);
+      }
+
+      const baseScale = Math.min(1.4, 0.85 + (state.tamanho * 0.055));
+      cakeGroup.scale.set(baseScale, baseScale, baseScale);
+
+      const mColor = massaColors[state.massa] || massaColors.branca;
+      const cakeMat = new THREE.MeshStandardMaterial({ color: mColor, roughness: 0.6 });
+
+      // Camadas do bolo (3 discos de massa)
+      const layers = 3;
+      const layerHeight = 0.22;
+      const cakeRadius = 1.1;
+
+      for (let i = 0; i < layers; i++) {
+        const cakeGeo = new THREE.CylinderGeometry(cakeRadius, cakeRadius, layerHeight, 48);
+        const layerMesh = new THREE.Mesh(cakeGeo, cakeMat);
+        layerMesh.position.y = 0.15 + (i * (layerHeight + 0.05));
+        layerMesh.castShadow = true;
+        layerMesh.receiveShadow = true;
+        cakeGroup.add(layerMesh);
+
+        // Recheios entre as camadas
+        if (i < layers - 1) {
+          const rKey = (i === 0) ? (state.recheio1 !== 'none' ? state.recheio1 : state.recheio2) : (state.recheio2 !== 'none' ? state.recheio2 : state.recheio1);
+          if (rKey && rKey !== 'none') {
+            const fillMat = new THREE.MeshStandardMaterial({ color: recheioColors[rKey] || 0xFFFDD0, roughness: 0.4 });
+            const fillGeo = new THREE.CylinderGeometry(cakeRadius - 0.02, cakeRadius - 0.02, 0.05, 48);
+            const fillMesh = new THREE.Mesh(fillGeo, fillMat);
+            fillMesh.position.y = layerMesh.position.y + (layerHeight / 2) + 0.025;
+            cakeGroup.add(fillMesh);
+          }
+        }
+      }
+
+      // Cobertura externa
+      if (state.cobertura !== 'none' && coberturaColors[state.cobertura]) {
+        const cobColor = coberturaColors[state.cobertura];
+        const cobMat = new THREE.MeshStandardMaterial({ color: cobColor, roughness: 0.35 });
+        const totalHeight = (layers * layerHeight) + ((layers - 1) * 0.05);
+        const cobGeo = new THREE.CylinderGeometry(cakeRadius + 0.03, cakeRadius + 0.03, totalHeight + 0.04, 48);
+        const cobMesh = new THREE.Mesh(cobGeo, cobMat);
+        cobMesh.position.y = 0.15 + (totalHeight / 2) - 0.02;
+        cobMesh.castShadow = true;
+        cakeGroup.add(cobMesh);
+      }
+    }
+
+    function updateCake() {
+      buildCake();
+      if (controls) controls.update();
+    }
+
+    // Eventos da Interface
+    const btnMassaBranca = document.getElementById('btn-massa-branca');
+    const btnMassaMista = document.getElementById('btn-massa-mista');
+    const btnMassaChocolate = document.getElementById('btn-massa-chocolate');
+    const btnMassaBaunilha = document.getElementById('btn-massa-baunilha');
+    const btnMassaAmanteigada = document.getElementById('btn-massa-amanteigada');
+
+    function setActiveMassaBtn(activeBtn) {
+      [btnMassaBranca, btnMassaMista, btnMassaChocolate, btnMassaBaunilha, btnMassaAmanteigada].forEach(btn => {
+        if (btn) btn.classList.remove('btn-active');
+      });
+      if (activeBtn) activeBtn.classList.add('btn-active');
+    }
+
+    if (btnMassaBranca) btnMassaBranca.addEventListener('click', () => { state.massa = 'branca'; setActiveMassaBtn(btnMassaBranca); updateCake(); });
+    if (btnMassaMista) btnMassaMista.addEventListener('click', () => { state.massa = 'mista'; setActiveMassaBtn(btnMassaMista); updateCake(); });
+    if (btnMassaChocolate) btnMassaChocolate.addEventListener('click', () => { state.massa = 'chocolate'; setActiveMassaBtn(btnMassaChocolate); updateCake(); });
+    if (btnMassaBaunilha) btnMassaBaunilha.addEventListener('click', () => { state.massa = 'baunilha'; setActiveMassaBtn(btnMassaBaunilha); updateCake(); });
+    if (btnMassaAmanteigada) btnMassaAmanteigada.addEventListener('click', () => { state.massa = 'amanteigada'; setActiveMassaBtn(btnMassaAmanteigada); updateCake(); });
+
+    setActiveMassaBtn(btnMassaBranca);
+
+    const sizeInput = document.getElementById('sizeInput');
+    const singleFillingContainer = document.getElementById('singleFillingContainer');
+    const doubleFillingContainer = document.getElementById('doubleFillingContainer');
+    const recheioBadge = document.getElementById('recheioBadge');
+    const selectRecheio1 = document.getElementById('selectRecheio1');
+    const selectRecheio2 = document.getElementById('selectRecheio2');
+
+    function checkFillingMode() {
+      if (state.tamanho >= 3) {
+        if (singleFillingContainer) singleFillingContainer.classList.add('hidden');
+        if (doubleFillingContainer) doubleFillingContainer.classList.remove('hidden');
+        if (recheioBadge) recheioBadge.innerText = 'Até 2 Recheios (3kg+)';
+      } else {
+        if (singleFillingContainer) singleFillingContainer.classList.remove('hidden');
+        if (doubleFillingContainer) doubleFillingContainer.classList.add('hidden');
+        if (recheioBadge) recheioBadge.innerText = '1 Recheio (<3kg)';
+      }
+    }
+
+    if (sizeInput) {
+      sizeInput.addEventListener('input', (e) => {
+        state.tamanho = parseFloat(e.target.value) || 1;
+        checkFillingMode();
+        updateCake();
+      });
+    }
+
+    if (singleRecheioSelect) {
+      singleRecheioSelect.addEventListener('change', (e) => {
+        state.recheio1 = e.target.value;
+        state.recheio2 = 'none';
+        updateCake();
+      });
+    }
+
+    if (selectRecheio1) {
+      selectRecheio1.addEventListener('change', (e) => {
+        state.recheio1 = e.target.value;
+        updateCake();
+      });
+    }
+
+    if (selectRecheio2) {
+      selectRecheio2.addEventListener('change', (e) => {
+        state.recheio2 = e.target.value;
+        updateCake();
+      });
+    }
+
+    // Modal e Envio do Pedido
+    const btnFinalizar = document.getElementById('btn-finalizar');
+    const orderModal = document.getElementById('orderModal');
+    const orderStepSummary = document.getElementById('orderStepSummary');
+    const orderStepForm = document.getElementById('orderStepForm');
+    const modalSummaryText = document.getElementById('modalSummaryText');
+    const btnCloseModal = document.getElementById('btn-close-modal');
+    const btnConfirmOrder = document.getElementById('btn-confirm-order');
+    const btnBackToSummary = document.getElementById('btn-back-to-summary');
+    const deliveryForm = document.getElementById('deliveryForm');
+
+    if (btnFinalizar && orderModal && modalSummaryText) {
+      btnFinalizar.addEventListener('click', () => {
+        const massaNome = state.massa.toUpperCase();
+        let recheioNome = 'Nenhum';
+
+        if (state.tamanho >= 3) {
+          const r1 = selectRecheio1 && selectRecheio1.value !== 'none' ? selectRecheio1.options[selectRecheio1.selectedIndex].text : '';
+          const r2 = selectRecheio2 && selectRecheio2.value !== 'none' ? selectRecheio2.options[selectRecheio2.selectedIndex].text : '';
+          if (r1 && r2) recheioNome = `${r1} & ${r2}`;
+          else if (r1) recheioNome = r1;
+          else if (r2) recheioNome = r2;
+        } else {
+          recheioNome = singleRecheioSelect ? singleRecheioSelect.options[singleRecheioSelect.selectedIndex].text : 'Nenhum';
+        }
+
+        const cobNome = coberturaSelect ? coberturaSelect.options[coberturaSelect.selectedIndex].text : 'Nenhuma';
+        const decNome = decoracaoSelect ? decoracaoSelect.options[decoracaoSelect.selectedIndex].text : 'Nenhuma';
+        const temaVal = inputTemaTopper ? inputTemaTopper.value.trim() : '';
+
+        modalSummaryText.innerHTML = `
+          <p><strong>Tamanho:</strong> ${state.tamanho} KG</p>
+          <p><strong>Massa:</strong> ${massaNome}</p>
+          <p><strong>Recheio(s):</strong> ${recheioNome}</p>
+          <p><strong>Cobertura:</strong> ${cobNome}</p>
+          <p><strong>Decoração:</strong> ${decNome}</p>
+          ${temaVal ? `<p><strong>Tema do Topo:</strong> ${temaVal}</p>` : ''}
+        `;
+
+        if (orderStepSummary) orderStepSummary.classList.remove('hidden');
+        if (orderStepForm) orderStepForm.classList.add('hidden');
+        orderModal.classList.remove('opacity-0', 'pointer-events-none');
+      });
+    }
+
+    if (btnCloseModal && orderModal) {
+      btnCloseModal.addEventListener('click', () => {
+        orderModal.classList.add('opacity-0', 'pointer-events-none');
+      });
+    }
+
+    if (btnConfirmOrder && orderStepSummary && orderStepForm) {
+      btnConfirmOrder.addEventListener('click', () => {
+        orderStepSummary.classList.add('hidden');
+        orderStepForm.classList.remove('hidden');
+      });
+    }
+
+    if (btnBackToSummary && orderStepSummary && orderStepForm) {
+      btnBackToSummary.addEventListener('click', () => {
+        orderStepForm.classList.add('hidden');
+        orderStepSummary.classList.remove('hidden');
+      });
+    }
+
+    if (deliveryForm) {
+      deliveryForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+
+        const name = document.getElementById('custName').value.trim();
+        const phone = document.getElementById('custPhone').value.trim();
+        const dateRaw = document.getElementById('deliveryDate').value;
+        const time = document.getElementById('deliveryTime').value;
+        const address = document.getElementById('custAddress').value.trim();
+
+        // Formatar data para DD/MM/AAAA
+        let dateFormatted = dateRaw;
+        if (dateRaw && dateRaw.includes('-')) {
+          const parts = dateRaw.split('-');
+          dateFormatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+
+        const massaNome = state.massa.toUpperCase();
+        let recheioNome = 'Nenhum';
+        if (state.tamanho >= 3) {
+          const r1 = selectRecheio1 && selectRecheio1.value !== 'none' ? selectRecheio1.options[selectRecheio1.selectedIndex].text : '';
+          const r2 = selectRecheio2 && selectRecheio2.value !== 'none' ? selectRecheio2.options[selectRecheio2.selectedIndex].text : '';
+          if (r1 && r2) recheioNome = `${r1} & ${r2}`;
+          else if (r1) recheioNome = r1;
+          else if (r2) recheioNome = r2;
+        } else {
+          recheioNome = singleRecheioSelect ? singleRecheioSelect.options[singleRecheioSelect.selectedIndex].text : 'Nenhum';
+        }
+
+        const cobNome = coberturaSelect ? coberturaSelect.options[coberturaSelect.selectedIndex].text : 'Nenhuma';
+        const decNome = decoracaoSelect ? decoracaoSelect.options[decoracaoSelect.selectedIndex].text : 'Nenhuma';
+        const temaVal = inputTemaTopper ? inputTemaTopper.value.trim() : 'Nenhum';
+
+        const messageText = 
+`🎂 *NOVO PEDIDO - DELICIARTE DA JANINHA*
+
+👤 *CLIENTE:* ${name}
+📞 *CONTATO:* ${phone}
+📅 *DATA DE ENTREGA:* ${dateFormatted}
+⏰ *HORÁRIO:* ${time}
+📍 *ENDEREÇO/RETIRADA:* ${address}
+
+--- *DETALHES DO BOLO* ---
+⚖️ *Tamanho:* ${state.tamanho} kg
+🧁 *Massa:* ${massaNome}
+🍫 *Recheio(s):* ${recheioNome}
+✨ *Cobertura:* ${cobNome}
+🎨 *Decoração:* ${decNome}
+🏷️ *Tema do Topo:* ${temaVal}`;
+
+        // Trata o número digitado pelo cliente (remove caracteres não numéricos)
+        let cleanPhone = phone.replace(/\D/g, '');
+        if (cleanPhone.length > 0 && !cleanPhone.startsWith('55')) {
+          cleanPhone = '55' + cleanPhone;
+        }
+
+        // Se o cliente não digitou um número válido, utiliza o número padrão da confeitaria
+        const targetPhone = cleanPhone.length >= 10 ? cleanPhone : '5583988558021';
+
+        const whatsappUrl = `https://wa.me/${targetPhone}?text=${encodeURIComponent(messageText)}`;
+        window.open(whatsappUrl, '_blank');
+      });
+    }
+
+    // Inicialização da Renderização e Loop
+    updateCake();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      if (controls) controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    if (loader) loader.style.display = 'none';
+    if (hint) {
+      hint.style.opacity = '1';
+      setTimeout(() => { hint.style.opacity = '0'; }, 3500);
+    }
+
+    window.addEventListener('resize', () => {
+      const w = container.clientWidth || (window.innerWidth * 0.66);
+      const h = container.clientHeight || window.innerHeight;
+      if (w > 0 && h > 0) {
+        renderer.setSize(w, h);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      }
+    });
+
+  } catch (err) {
+    console.error('❌ Erro na cena 3D:', err);
+    if (loader) loader.innerHTML = `<div class="p-4 bg-amber-50 border border-amber-300 rounded-xl text-center"><div class="text-amber-800 font-bold text-sm mb-1">Modo de Compatibilidade</div><div class="text-xs text-amber-700 mb-3">O navegador utilizou o visualizador direto.</div><button onclick="location.reload()" class="px-4 py-1.5 bg-amber-600 text-white font-bold rounded-lg text-xs">Tentar Novamente</button></div>`;
+  }
+}
+
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  setTimeout(initApp, 50);
+} else {
+  document.addEventListener('DOMContentLoaded', initApp);
+}
+</script>
+</body>
+</html>
