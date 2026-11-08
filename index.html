@@ -564,10 +564,13 @@ function initApp() {
         const cobColor = coberturaColors[state.cobertura];
         const cobMat = new THREE.MeshStandardMaterial({ color: cobColor, roughness: 0.35 });
         const totalHeight = (layers * layerHeight) + ((layers - 1) * 0.05);
-        const cobGeo = new THREE.CylinderGeometry(cakeRadius + 0.03, cakeRadius + 0.03, totalHeight + 0.04, 48);
+        
+        // Cobertura total envelopando topo e laterais do bolo
+        const cobGeo = new THREE.CylinderGeometry(cakeRadius + 0.05, cakeRadius + 0.05, totalHeight + 0.08, 48);
         const cobMesh = new THREE.Mesh(cobGeo, cobMat);
         cobMesh.position.y = 0.15 + (totalHeight / 2) - 0.02;
         cobMesh.castShadow = true;
+        cobMesh.receiveShadow = true;
         cakeGroup.add(cobMesh);
       }
     }
