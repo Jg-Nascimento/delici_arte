@@ -565,10 +565,10 @@ function initApp() {
         const cobMat = new THREE.MeshStandardMaterial({ color: cobColor, roughness: 0.35 });
         const totalHeight = (layers * layerHeight) + ((layers - 1) * 0.05);
         
-        // Cobertura total envelopando topo e laterais do bolo
-        const cobGeo = new THREE.CylinderGeometry(cakeRadius + 0.05, cakeRadius + 0.05, totalHeight + 0.08, 48);
+        // Cobertura total envelopando topo e toda a lateral externa das camadas
+        const cobGeo = new THREE.CylinderGeometry(cakeRadius + 0.06, cakeRadius + 0.06, totalHeight + 0.1, 48);
         const cobMesh = new THREE.Mesh(cobGeo, cobMat);
-        cobMesh.position.y = 0.15 + (totalHeight / 2) - 0.02;
+        cobMesh.position.y = 0.15 + (totalHeight / 2) - 0.01;
         cobMesh.castShadow = true;
         cobMesh.receiveShadow = true;
         cakeGroup.add(cobMesh);
@@ -601,6 +601,15 @@ function initApp() {
     if (btnMassaAmanteigada) btnMassaAmanteigada.addEventListener('click', () => { state.massa = 'amanteigada'; setActiveMassaBtn(btnMassaAmanteigada); updateCake(); });
 
     setActiveMassaBtn(btnMassaBranca);
+
+    // Adiciona listener para alteração de cobertura
+    const coberturaSelect = document.getElementById('coberturaSelect');
+    if (coberturaSelect) {
+      coberturaSelect.addEventListener('change', (e) => {
+        state.cobertura = e.target.value;
+        updateCake();
+      });
+    }
 
     const sizeInput = document.getElementById('sizeInput');
     const singleFillingContainer = document.getElementById('singleFillingContainer');
@@ -768,38 +777,51 @@ function initApp() {
 
         // Trata o número digitado pelo cliente (remove caracteres não numéricos)
         let cleanPhone = phone.replace(/\D/g, '');
-        if (cleanPhone.length > 0 && !cleanPhone.startsWith('55')) {
+        
+        // Se for um número brasileiro padrão (ex: 83991438527 - 10 ou 11 dígitos), adiciona o DDI 55
+        if (cleanPhone.length === 10 || cleanPhone.length === 11) {
           cleanPhone = '55' + cleanPhone;
         }
 
-        // Se o cliente não digitou um número válido, utiliza o número padrão da confeitaria
-        const targetPhone = cleanPhone.length >= 10 ? cleanPhone : '5583988558021';
+        // Se o número limpo for válido (com 12 ou 13 dígitos incluindo 55), usa ele; caso contrário, usa o padrão da loja
+        const targetPhone = (cleanPhone.length >= 12 && cleanPhone.length <= 13) ? cleanPhone : '5583988558021';
 
         const whatsappUrl = `https://wa.me/${targetPhone}?text=${encodeURIComponent(messageText)}`;
-        window.open(whatsappUrl, '_blank');
+        
+        // Abre diretamente o WhatsApp sem ser bloqueado por pop-ups no celular
+        window.location.href = whatsappUrl;
       });
     }
 
     // Inicialização da Renderização e Loop
-    updateCake();
-
     function animate() {
       requestAnimationFrame(animate);
       if (controls) controls.update();
-      renderer.render(scene, camera);
+      if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+      }
     }
+    
+    // Inicia a animação 3D
     animate();
 
+    // Esconde o loader e exibe a dica
     if (loader) loader.style.display = 'none';
     if (hint) {
       hint.style.opacity = '1';
-      setTimeout(() => { hint.style.opacity = '0'; }, 3500);
+      setTimeout(() => {
+        hint.style.opacity = '0';
+      }, 3500);
     }
 
+    // Renderiza a cobertura e o estado inicial do bolo
+    buildCake();
+
+    // Redimensionamento responsivo da tela
     window.addEventListener('resize', () => {
       const w = container.clientWidth || (window.innerWidth * 0.66);
       const h = container.clientHeight || window.innerHeight;
-      if (w > 0 && h > 0) {
+      if (w > 0 && h > 0 && renderer && camera) {
         renderer.setSize(w, h);
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
@@ -807,11 +829,20 @@ function initApp() {
     });
 
   } catch (err) {
-    console.error('❌ Erro na cena 3D:', err);
-    if (loader) loader.innerHTML = `<div class="p-4 bg-amber-50 border border-amber-300 rounded-xl text-center"><div class="text-amber-800 font-bold text-sm mb-1">Modo de Compatibilidade</div><div class="text-xs text-amber-700 mb-3">O navegador utilizou o visualizador direto.</div><button onclick="location.reload()" class="px-4 py-1.5 bg-amber-600 text-white font-bold rounded-lg text-xs">Tentar Novamente</button></div>`;
+    console.error('❌ Erro na inicialização 3D:', err);
+    if (loader) {
+      loader.innerHTML = `
+        <div class="p-4 bg-amber-50 border border-amber-300 rounded-2xl text-center max-w-xs mx-auto shadow-lg">
+          <p class="text-xs font-bold text-[#2b0c0e] mb-2">Modo de Compatibilidade</p>
+          <p class="text-[11px] text-gray-600 mb-3">Seu navegador restringiu a aceleração WebGL 3D, mas você ainda pode personalizar seu pedido normalmente!</p>
+          <button onclick="location.reload()" class="px-4 py-2 bg-[#e5a823] text-[#2b0c0e] font-bold text-xs rounded-xl shadow">Tentar Novamente</button>
+        </div>
+      `;
+    }
   }
 }
 
+// Inicialização segura após o carregamento da página
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
   setTimeout(initApp, 50);
 } else {
