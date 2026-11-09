@@ -220,7 +220,7 @@ html, body {
       <option value="ganache">Ganache</option>
     </select>
   </div>
-
+<!-- 
   <div class="space-y-2 p-3.5 md:p-4 bg-white/80 rounded-2xl border border-amber-200/60 shadow-sm">
     <label class="block text-xs md:text-sm font-bold text-[#3b1810] uppercase tracking-wide">Decoração Adicional</label>
     <select id="decoracaoSelect" class="w-full py-2.5 px-3 rounded-xl border-2 border-amber-200 bg-white text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#e5a823] shadow-sm">
@@ -236,7 +236,7 @@ html, body {
         <button id="btnGerarTopper" class="px-3 py-2 bg-[#2b0c0e] text-[#e5a823] font-bold rounded-xl text-xs border border-[#e5a823] hover:bg-[#4a191b] active:scale-95 transition-all shadow-sm flex items-center gap-1 shrink-0">✨ Aplicar</button>
       </div>
     </div>
-  </div>
+  </div> -->
 
   <div class="mt-auto pt-2 pb-1">
     <button id="btn-finalizar" class="w-full py-3.5 bg-gradient-to-r from-[#4a191b] via-[#2b0c0e] to-[#4a191b] text-[#e5a823] border-2 border-[#e5a823] rounded-2xl font-bold text-base shadow-lg shadow-black/20 hover:shadow-black/30 hover:scale-[1.01] active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-2">
@@ -248,31 +248,19 @@ html, body {
   </div>
 </div>
 
-<div class="w-full h-[45vh] md:h-full md:w-2/3 relative bg-[#EFE3D3] order-1 md:order-2 overflow-hidden" id="canvas-container" style="touch-action: none;">
+<div class="w-full h-[45vh] md:h-full md:w-2/3 relative bg-[#2b1a1c] order-1 md:order-2 overflow-hidden" id="canvas-container" style="touch-action: none;">
   
-  <!-- Avatar da Janinha posicionado com segurança via HTML (sem travar o WebGL) -->
-  <div id="janinhaAvatarContainer" class="absolute bottom-2 left-3 md:bottom-6 md:left-8 z-10 pointer-events-none flex items-end gap-2 transition-all duration-300">
-    <div class="relative group">
-      <!-- Balão de Fala / Anotações -->
-      <div id="janinhaSpeechBubble" class="absolute -top-12 left-12 bg-white/95 text-[#2b0c0e] font-bold text-[11px] md:text-xs px-3 py-1.5 rounded-2xl shadow-lg border-2 border-[#e5a823] whitespace-nowrap opacity-0 transition-all duration-300 transform -translate-y-2">
-        <span>Olá! Vamos montar seu bolo? 🎂</span>
-      </div>
-      <!-- Imagem da Janinha -->
-      <img id="janinhaImg" src="https://i.postimg.cc/Jsd2zVV2/jn3d-2.jpg" alt="Janinha Confeiteira" class="w-24 md:w-36 h-auto drop-shadow-xl object-contain transform transition-transform duration-300 hover:scale-105" onerror="this.style.display='none'">
-    </div>
-  </div>
-
   <div id="loader" class="loader">
     <div class="mb-2">
       <span class="loader-dot"></span>
       <span class="loader-dot"></span>
       <span class="loader-dot"></span>
     </div>
-    <div class="text-xs font-semibold text-[#8C6239]">Carregando Confeitaria 3D...</div>
+    <div class="text-xs font-semibold text-[#e5a823]">Carregando Confeitaria 3D...</div>
   </div>
 
   <div id="hint" class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-[#F5EBE0]/90 text-[#6B4B27] border border-[#D4A373]/50 backdrop-blur px-4 py-2 rounded-full text-xs font-bold shadow-md pointer-events-none transition-opacity duration-500 opacity-0 z-10">
-    👆 Arraste para visualizar o bolo de outros ângulos
+    👆 Arraste para girar o bolo
   </div>
 </div>
 
@@ -341,6 +329,485 @@ html, body {
 </div>
 
 <script>
+/* ============================================================
+   AMBIENTE CONFEITARIA - DeliciArte da Janinha  (v2)
+   Three.js r128 + GSAP.
+   Salão + mesa retrô + bailarina de cristal + bolo no topo.
+
+   COMO USAR (dentro do initApp, depois de criar scene, camera,
+   renderer, controls e cakeGroup, e ANTES do primeiro buildCake()):
+
+     const ambiente = aplicarAmbienteConfeitaria({ scene, renderer, camera, controls, cakeGroup,
+       janinhaUrl,   // URL da imagem da Janinha (PNG com fundo transparente)
+       balaoEl,      // elemento HTML do balão de fala (posicionado sobre a cabeça dela)
+       fallbackEl }); // <img> de reserva, mostrado só se a textura não carregar
+
+   Depois, SEMPRE que o bolo for reconstruído, sincronize:
+
+     function updateCake() { buildCake(); ambiente.sincronizarBolo(); }
+
+   e logo após o primeiro buildCake() da inicialização:
+
+     buildCake();
+     ambiente.sincronizarBolo();
+
+   Apague o bloco antigo de luzes/materiais/paredes/piso.
+   ============================================================ */
+
+function aplicarAmbienteConfeitaria({ scene, renderer, camera, controls, cakeGroup, janinhaUrl, balaoEl, fallbackEl }) {
+
+  // ---------- 1. RENDERER (principal causa do "estouro" branco) ----------
+  renderer.physicallyCorrectLights = false;           // evita luzes absurdamente fortes
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; // comprime brancos estourados
+  renderer.toneMappingExposure = 0.9;                 // ajuste fino: 0.7 = mais escuro, 1.1 = mais claro
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  // ---------- 2. LIMPA CENÁRIO ANTIGO (mantém só o bolo) ----------
+  [...scene.children].forEach(obj => {
+    if (obj === cakeGroup) return;
+    scene.remove(obj);
+    obj.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) {
+        (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => {
+          if (m.map) m.map.dispose();
+          m.dispose();
+        });
+      }
+    });
+  });
+
+  // ---------- 3. PALETA ----------
+  const P = {
+    fundo:       0x2b1a1c,  // fundo escuro, o ambiente "brilha" contra ele
+    parede:      0x8a4552,  // bordô rosado médio
+    painel:      0x5e2a34,  // lambri inferior mais escuro
+    moldura:     0xe5a823,  // dourado da marca
+    pisoClaro:   0xe9dcc6,  // mármore creme
+    pisoEscuro:  0x6b4630,  // chocolate
+    teto:        0x4a2530,
+    balcao:      0x3d2314,
+    tampo:       0xf3e9dc,
+    tapete:      0x7a2e3b,
+    luzQuente:   0xffc98a,
+    mesaTampo:   0x5cbfb1,  // verde-água (turquesa suavizado p/ combinar com bordô e dourado)
+    madeira:     0xd9954a   // madeira clara dos pés
+  };
+
+  scene.background = new THREE.Color(P.fundo);
+  scene.fog = new THREE.Fog(P.fundo, 16, 34);
+
+  const mat = (color, rough = 0.7, metal = 0, extra = {}) =>
+    new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal, ...extra });
+
+  const room = new THREE.Group();
+  room.name = 'confeitaria';
+  scene.add(room);
+
+  const add = (mesh, x = 0, y = 0, z = 0, shadow = true) => {
+    mesh.position.set(x, y, z);
+    mesh.castShadow = shadow;
+    mesh.receiveShadow = true;
+    room.add(mesh);
+    return mesh;
+  };
+
+  // Dimensões do salão
+  const W = 18, D = 14, H = 6.5;
+  const backZ = -D / 2 + 1; // parede do fundo
+
+  // ---------- 4. PISO xadrez (contraste forte = profundidade) ----------
+  const tile = document.createElement('canvas');
+  tile.width = tile.height = 256;
+  const tc = tile.getContext('2d');
+  tc.fillStyle = '#e9dcc6'; tc.fillRect(0, 0, 256, 256);
+  tc.fillStyle = '#6b4630'; tc.fillRect(0, 0, 128, 128); tc.fillRect(128, 128, 128, 128);
+  tc.strokeStyle = 'rgba(0,0,0,0.25)'; tc.lineWidth = 3; tc.strokeRect(0, 0, 256, 256);
+  const floorTex = new THREE.CanvasTexture(tile);
+  floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping;
+  floorTex.repeat.set(W / 2, D / 2);
+  floorTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  const floor = add(new THREE.Mesh(
+    new THREE.PlaneGeometry(W, D),
+    mat(0xffffff, 0.35, 0.05, { map: floorTex })
+  ), 0, 0, 0, false);
+  floor.rotation.x = -Math.PI / 2;
+
+  // Tapete redondo sob o bolo
+  const rug = add(new THREE.Mesh(new THREE.CircleGeometry(3.2, 64), mat(P.tapete, 0.95)), 0, 0.01, 0, false);
+  rug.rotation.x = -Math.PI / 2;
+  const rugRing = add(new THREE.Mesh(new THREE.RingGeometry(3.0, 3.2, 64), mat(P.moldura, 0.4, 0.6)), 0, 0.012, 0, false);
+  rugRing.rotation.x = -Math.PI / 2;
+
+  // ---------- 5. PAREDES + LAMBRI + MOLDURAS ----------
+  const wallMat = mat(P.parede, 0.85);
+  const panelMat = mat(P.painel, 0.75);
+  const goldMat = mat(P.moldura, 0.3, 0.7);
+
+  // Fundo
+  add(new THREE.Mesh(new THREE.PlaneGeometry(W, H), wallMat), 0, H / 2, backZ, false);
+  // Laterais
+  const left = add(new THREE.Mesh(new THREE.PlaneGeometry(D, H), wallMat), -W / 2, H / 2, 0, false);
+  left.rotation.y = Math.PI / 2;
+  const right = add(new THREE.Mesh(new THREE.PlaneGeometry(D, H), wallMat), W / 2, H / 2, 0, false);
+  right.rotation.y = -Math.PI / 2;
+  // Teto
+  const ceil = add(new THREE.Mesh(new THREE.PlaneGeometry(W, D), mat(P.teto, 0.9)), 0, H, 0, false);
+  ceil.rotation.x = Math.PI / 2;
+
+  // Lambri (metade inferior da parede do fundo) + friso dourado
+  add(new THREE.Mesh(new THREE.BoxGeometry(W, 1.8, 0.12), panelMat), 0, 0.9, backZ + 0.06);
+  add(new THREE.Mesh(new THREE.BoxGeometry(W, 0.08, 0.16), goldMat), 0, 1.84, backZ + 0.08);
+  // Rodapé dourado
+  add(new THREE.Mesh(new THREE.BoxGeometry(W, 0.12, 0.16), goldMat), 0, 0.06, backZ + 0.08);
+
+  // Quadros em moldura dourada (painéis na parede)
+  [-5.5, 5.5].forEach(x => {
+    add(new THREE.Mesh(new THREE.BoxGeometry(2.6, 3.2, 0.08), goldMat), x, 3.7, backZ + 0.05);
+    add(new THREE.Mesh(new THREE.BoxGeometry(2.3, 2.9, 0.1), mat(0xf6e7d2, 0.9)), x, 3.7, backZ + 0.06);
+  });
+
+  // Letreiro central com o nome
+  const sign = document.createElement('canvas');
+  sign.width = 1024; sign.height = 384;
+  const sc = sign.getContext('2d');
+  const signTex = new THREE.CanvasTexture(sign);
+  function desenharLetreiro() {
+    sc.fillStyle = '#2b0c0e'; sc.fillRect(0, 0, 1024, 384);
+    sc.strokeStyle = '#e5a823'; sc.lineWidth = 14; sc.strokeRect(10, 10, 1004, 364);
+    sc.fillStyle = '#e5a823';
+    sc.textAlign = 'center'; sc.textBaseline = 'middle';
+    sc.font = '150px "Great Vibes", cursive';
+    sc.fillText('DeliciArte', 512, 150);
+    sc.font = '90px "Great Vibes", cursive';
+    sc.fillStyle = '#f5d77f';
+    sc.fillText('da Janinha', 512, 270);
+    signTex.needsUpdate = true;
+  }
+  desenharLetreiro();
+  // redesenha quando a fonte Great Vibes terminar de carregar
+  if (document.fonts && document.fonts.load) {
+    document.fonts.load('150px "Great Vibes"').then(desenharLetreiro).catch(() => {});
+  }
+  add(new THREE.Mesh(
+    new THREE.PlaneGeometry(4.2, 1.575),
+    new THREE.MeshStandardMaterial({ map: signTex, emissive: 0xffffff, emissiveMap: signTex, emissiveIntensity: 0.35, roughness: 0.6 })
+  ), 0, 4.1, backZ + 0.1, false);
+
+  // ---------- 6. BALCÃO DE VITRINE (ao fundo, longe do bolo) ----------
+  const counterZ = backZ + 1.4;
+  add(new THREE.Mesh(new THREE.BoxGeometry(10, 1.1, 1.4), mat(P.balcao, 0.55)), 0, 0.55, counterZ);
+  add(new THREE.Mesh(new THREE.BoxGeometry(10.3, 0.12, 1.7), mat(P.tampo, 0.25, 0.05)), 0, 1.16, counterZ);
+  add(new THREE.Mesh(new THREE.BoxGeometry(10.1, 0.06, 1.5), goldMat), 0, 0.06, counterZ);
+
+  // Domos de vidro com doces sobre o balcão
+  const glass = new THREE.MeshStandardMaterial({
+    color: 0xffffff, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.22
+  });
+  const doces = [0xd95d7a, 0xf2c14e, 0x8a4b2a, 0xf7f0e6, 0xb5445a];
+  for (let i = 0; i < 5; i++) {
+    const x = -4 + i * 2;
+    add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.06, 32), goldMat), x, 1.25, counterZ, false);
+    add(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.22, 24), mat(doces[i], 0.5)), x, 1.38, counterZ);
+    add(new THREE.Mesh(new THREE.SphereGeometry(0.46, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2), glass), x, 1.28, counterZ, false);
+  }
+
+  // ---------- 7. PRATELEIRAS COM POTES ----------
+  [2.4, 3.1].forEach(y => {
+    [-8.4, 8.4].forEach(x => {
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 4), mat(P.balcao, 0.6)), x, y, -1);
+      for (let k = 0; k < 5; k++) {
+        const jar = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.14, 0.14, 0.32, 16),
+          mat(doces[(k + (y > 2.5 ? 2 : 0)) % 5], 0.4, 0.05)
+        );
+        add(jar, x, y + 0.2, -2.6 + k * 0.85);
+      }
+    });
+  });
+
+  // ---------- 8. LUSTRES PENDENTES ----------
+  const lampPositions = [[-5.5, -1], [0, 1.5], [5.5, -1]];
+  lampPositions.forEach(([x, z]) => {
+    add(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.6, 8), goldMat), x, H - 0.8, z, false);
+    add(new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.4, 24, 1, true), mat(P.moldura, 0.3, 0.7, { side: THREE.DoubleSide })), x, H - 1.7, z, false);
+    add(new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 12), new THREE.MeshBasicMaterial({ color: P.luzQuente })), x, H - 1.75, z, false);
+
+    const pl = new THREE.PointLight(P.luzQuente, 0.55, 14, 2);
+    pl.position.set(x, H - 1.9, z);
+    room.add(pl);
+  });
+
+  // ---------- 9. ILUMINAÇÃO EQUILIBRADA ----------
+  // Luz de preenchimento céu/chão: dá cor às sombras sem estourar
+  room.add(new THREE.HemisphereLight(0xffe3c8, 0x3a2024, 0.6));
+
+  // Luz principal quente com sombras suaves
+  const key = new THREE.DirectionalLight(0xfff0dc, 0.65);
+  key.position.set(5, 11, 7);
+  key.castShadow = true;
+  key.shadow.mapSize.set(1024, 1024);
+  key.shadow.camera.left = -10; key.shadow.camera.right = 10;
+  key.shadow.camera.top = 10;   key.shadow.camera.bottom = -10;
+  key.shadow.camera.near = 1;   key.shadow.camera.far = 30;
+  key.shadow.bias = -0.0005;
+  room.add(key);
+
+  // Spot dourado destacando o bolo (ele é a estrela da cena)
+  const spot = new THREE.SpotLight(0xffd9a0, 0.9, 20, Math.PI / 6, 0.5, 1.5);
+  spot.position.set(0, 7, 2.5);
+  spot.target.position.set(0, 2.0, 0);
+  spot.castShadow = true;
+  spot.shadow.mapSize.set(1024, 1024);
+  room.add(spot);
+  room.add(spot.target);
+
+  // Contraluz rosada para recortar o bolo do fundo
+  const rim = new THREE.DirectionalLight(0xff9db0, 0.25);
+  rim.position.set(-6, 5, -6);
+  room.add(rim);
+
+  let giro = 0; // rotação atual do bolo (só ele gira)
+
+  // ---------- 10. MESA RETRÔ (tampo verde-água + pés de madeira abertos) ----------
+  const MESA = { hx: 2.3, hz: 1.8, topY: 1.15 };
+
+  function retanguloArredondado(w, h, r) {
+    const sh = new THREE.Shape();
+    const x = -w / 2, y = -h / 2;
+    sh.moveTo(x + r, y);
+    sh.lineTo(x + w - r, y);     sh.quadraticCurveTo(x + w, y, x + w, y + r);
+    sh.lineTo(x + w, y + h - r); sh.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    sh.lineTo(x + r, y + h);     sh.quadraticCurveTo(x, y + h, x, y + h - r);
+    sh.lineTo(x, y + r);         sh.quadraticCurveTo(x, y, x + r, y);
+    return sh;
+  }
+
+  const mesaGroup = new THREE.Group();
+  mesaGroup.name = 'mesa';
+  room.add(mesaGroup);
+
+  const tampoGeo = new THREE.ExtrudeGeometry(
+    retanguloArredondado(MESA.hx * 2 - 0.06, MESA.hz * 2 - 0.06, 0.5),
+    { depth: 0.06, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 4, curveSegments: 20 }
+  );
+  const tampo = new THREE.Mesh(tampoGeo, new THREE.MeshPhysicalMaterial({
+    color: P.mesaTampo, roughness: 0.22, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.12
+  }));
+  tampo.rotation.x = -Math.PI / 2;
+  tampo.position.y = MESA.topY - 0.09; // face de cima exatamente em topY
+  tampo.castShadow = true; tampo.receiveShadow = true;
+  mesaGroup.add(tampo);
+
+  const madeira = mat(P.madeira, 0.5, 0.0);
+  // Travessa (moldura de madeira sob o tampo)
+  const travessa = new THREE.Mesh(new THREE.BoxGeometry(MESA.hx * 2 - 1.0, 0.12, MESA.hz * 2 - 0.9), madeira);
+  travessa.position.y = 0.96;
+  travessa.castShadow = true; travessa.receiveShadow = true;
+  mesaGroup.add(travessa);
+
+  // Pés cônicos inclinados para fora
+  const legH = 1.0, tilt = 0.14;
+  const legGeo = new THREE.CylinderGeometry(0.065, 0.04, legH, 20);
+  [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([sx, sz]) => {
+    const leg = new THREE.Mesh(legGeo, madeira);
+    const topX = MESA.hx - 0.5, topZ = MESA.hz - 0.45;
+    const shift = Math.sin(tilt) * legH / 2;
+    leg.position.set(sx * (topX + shift), 0.02 + legH / 2, sz * (topZ + shift));
+    leg.rotation.z = sx * tilt;     // base afasta para fora em X
+    leg.rotation.x = -sz * tilt;    // base afasta para fora em Z
+    leg.castShadow = true; leg.receiveShadow = true;
+    mesaGroup.add(leg);
+  });
+
+  // ---------- 11. BAILARINA (prato de cristal + haste facetada cromada) ----------
+  function criarEnvCromo() {
+    const grad = (stops) => {
+      const c = document.createElement('canvas'); c.width = c.height = 128;
+      const g = c.getContext('2d');
+      const gr = g.createLinearGradient(0, 0, 0, 128);
+      stops.forEach(([o, col]) => gr.addColorStop(o, col));
+      g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+      return { c, g };
+    };
+    const lat = grad([[0, '#ffe9c8'], [0.45, '#b86b5a'], [0.55, '#4a2530'], [1, '#2b1a1c']]);
+    lat.g.fillStyle = 'rgba(255,255,255,0.95)';       // "softbox" para brilho no cromo
+    lat.g.fillRect(22, 18, 34, 52);
+    lat.g.fillStyle = 'rgba(229,168,35,0.85)';
+    lat.g.fillRect(84, 30, 14, 60);
+    const topo = grad([[0, '#fff3dc'], [1, '#ffd9a0']]);
+    const chao = grad([[0, '#6b4630'], [1, '#2b1a1c']]);
+    const tex = new THREE.CubeTexture([lat.c, lat.c, topo.c, chao.c, lat.c, lat.c]);
+    tex.needsUpdate = true;
+    return tex;
+  }
+  const envCromo = criarEnvCromo();
+
+  const STAND = { plateY: 0.6 }; // altura da face de cima do prato sobre o tampo
+  const standGroup = new THREE.Group();
+  standGroup.name = 'bailarina';
+  standGroup.position.set(0, MESA.topY, 0);
+  room.add(standGroup);
+
+  const cromo = new THREE.MeshStandardMaterial({ color: 0xdfe3e8, metalness: 1, roughness: 0.12, envMap: envCromo });
+  const cristal = new THREE.MeshPhysicalMaterial({
+    color: 0xeaf6ff, metalness: 0, roughness: 0.04, transparent: true, opacity: 0.4,
+    clearcoat: 1, envMap: envCromo, envMapIntensity: 1.2, side: THREE.DoubleSide, depthWrite: false
+  });
+  const cristalLapidado = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff, metalness: 0, roughness: 0.05, transparent: true, opacity: 0.65,
+    envMap: envCromo, envMapIntensity: 1.4, depthWrite: false
+  });
+
+  const parte = (geo, material, y, sombra = true) => {
+    const m = new THREE.Mesh(geo, material);
+    m.position.y = y;
+    m.castShadow = sombra; m.receiveShadow = true;
+    standGroup.add(m);
+    return m;
+  };
+  // Base octogonal em degraus, haste facetada e nó
+  parte(new THREE.CylinderGeometry(0.30, 0.36, 0.10, 8), cromo, 0.05);
+  parte(new THREE.CylinderGeometry(0.20, 0.26, 0.06, 8), cromo, 0.13);
+  parte(new THREE.CylinderGeometry(0.09, 0.14, 0.28, 8), cromo, 0.30);
+  parte(new THREE.SphereGeometry(0.10, 20, 14), cromo, 0.50);
+  parte(new THREE.CylinderGeometry(0.06, 0.09, 0.06, 8), cromo, 0.57);
+
+  // Prato: reconstruído a cada mudança de tamanho do bolo
+  const tickGeo = new THREE.BoxGeometry(0.14, 0.03, 0.012);
+  let prato = null;
+  function construirPrato(r) {
+    if (prato) {
+      standGroup.remove(prato);
+      prato.traverse(o => { if (o.geometry && o.geometry !== tickGeo) o.geometry.dispose(); });
+    }
+    prato = new THREE.Group();
+    prato.position.y = STAND.plateY;
+    prato.rotation.y = giro;
+
+    const perfil = [
+      [0, 0], [r * 0.5, 0.002], [r * 0.9, 0.02], [r, 0.065], [r + 0.015, 0.085],
+      [r + 0.015, 0.07], [r, 0.05], [r * 0.9, 0.0], [r * 0.5, -0.03], [0, -0.03]
+    ].map(([x, y]) => new THREE.Vector2(x, y));
+    const disco = new THREE.Mesh(new THREE.LatheGeometry(perfil, 72), cristal);
+    disco.receiveShadow = true;
+    prato.add(disco);
+
+    // Lapidação da borda (riscos radiais)
+    const n = Math.max(36, Math.round(r * 40));
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const t = new THREE.Mesh(tickGeo, cristalLapidado);
+      const rr = r * 0.86;
+      t.position.set(Math.cos(a) * rr, 0.03, Math.sin(a) * rr);
+      t.rotation.y = -a;
+      prato.add(t);
+    }
+    standGroup.add(prato);
+  }
+  construirPrato(1.0);
+
+  // ---------- 12. BOLO SOBRE A BAILARINA ----------
+  const _box = new THREE.Box3();
+  const _size = new THREE.Vector3();
+
+  function sincronizarBolo() {
+    if (!cakeGroup) return;
+    // mede o bolo "limpo" (sem escala nem deslocamento)
+    cakeGroup.scale.setScalar(1);
+    cakeGroup.rotation.y = 0;
+    cakeGroup.position.y = 0;
+    cakeGroup.updateMatrixWorld(true);
+    _box.setFromObject(cakeGroup);
+    if (_box.isEmpty()) return;
+    _box.getSize(_size);
+
+    let cakeR = Math.max(_size.x, _size.z) / 2;
+    const maxPrato = MESA.hz - 0.2;      // prato nunca passa do tampo
+    const maxBolo = maxPrato - 0.15;
+    let escala = 1;
+    if (cakeR > maxBolo) { escala = maxBolo / cakeR; cakeR = maxBolo; } // bolo muito grande: reduz p/ caber
+    const pratoR = Math.min(Math.max(cakeR + 0.2, 0.85), maxPrato);
+    construirPrato(pratoR);
+
+    cakeGroup.scale.setScalar(escala);
+    cakeGroup.updateMatrixWorld(true);
+    _box.setFromObject(cakeGroup);
+    const baseY = MESA.topY + STAND.plateY + 0.005;
+    cakeGroup.position.y = baseY - _box.min.y;
+    cakeGroup.updateMatrixWorld(true);
+    _box.setFromObject(cakeGroup);
+    cakeGroup.rotation.y = giro; // devolve o giro atual
+
+    // câmera passa a orbitar o centro do bolo
+    if (controls) {
+      const alvoY = Math.min(2.6, Math.max(1.9, (baseY + _box.max.y) / 2));
+      if (window.gsap) {
+        gsap.to(controls.target, { y: alvoY, duration: 0.5, ease: 'power2.out', onUpdate: () => controls.update() });
+      } else {
+        controls.target.y = alvoY;
+        controls.update();
+      }
+    }
+  }
+
+  // ---------- 12b. GIRO SÓ DO BOLO (câmera, salão e Janinha ficam parados) ----------
+  const girar = (da) => {
+    giro += da;
+    cakeGroup.rotation.y = giro;
+    if (prato) prato.rotation.y = giro;
+  };
+  let velocidade = 0, arrastando = false, ultimoX = 0;
+  const dedos = new Set();
+  const alvoToque = renderer.domElement;
+  if (alvoToque) {
+    alvoToque.addEventListener('pointerdown', (e) => {
+      dedos.add(e.pointerId);
+      arrastando = dedos.size === 1;   // com 2 dedos (pinça/zoom) não gira
+      velocidade = 0;
+      ultimoX = e.clientX;
+    });
+    alvoToque.addEventListener('pointermove', (e) => {
+      if (!arrastando || !dedos.has(e.pointerId)) return;
+      const dx = e.clientX - ultimoX;
+      ultimoX = e.clientX;
+      const da = (dx / (alvoToque.clientWidth || 1)) * Math.PI * 2.2; // arrastar a tela toda ≈ 1,1 volta
+      girar(da);
+      velocidade = da;
+    });
+    const soltar = (e) => { dedos.delete(e.pointerId); if (dedos.size === 0) arrastando = false; };
+    alvoToque.addEventListener('pointerup', soltar);
+    alvoToque.addEventListener('pointercancel', soltar);
+  }
+
+  // loop leve: inércia do giro
+  function tick() {
+    requestAnimationFrame(tick);
+    if (!arrastando && Math.abs(velocidade) > 0.00005) { girar(velocidade); velocidade *= 0.93; }
+    else if (!arrastando) velocidade = 0;
+  }
+  if (typeof requestAnimationFrame === 'function') tick();
+
+  // ---------- 13. CÂMERA/CONTROLES: gira só ao redor e por cima ----------
+  if (camera) camera.position.set(0, 3.6, 5.4);
+  if (controls) {
+    controls.target.set(0, 2.0, 0);
+    controls.enablePan = false;                  // mantém o bolo sempre centralizado
+    controls.minAzimuthAngle = 0;                // câmera NÃO gira ao redor: quem gira é o bolo
+    controls.maxAzimuthAngle = 0;
+    controls.enableDamping = true;
+    controls.minDistance = 3.2;
+    controls.maxDistance = 6.2;                  // câmera sempre dentro do salão
+    controls.minPolarAngle = 0.85;               // limite de cima (não passa do teto)
+    controls.maxPolarAngle = Math.PI / 2 - 0.05; // NUNCA desce abaixo do nível do bolo
+    controls.update();
+  }
+
+  return { room, sincronizarBolo, getGiro: () => giro };
+}
+
+
 function initApp() {
   console.log('🎂 Iniciando DeliciArte 3D...');
 
@@ -373,11 +840,18 @@ function initApp() {
   const height = container.clientHeight || window.innerHeight;
 
   try {
+    // Fundo, névoa, luzes e cenário são montados por aplicarAmbienteConfeitaria()
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xD8C4A9);
 
     const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
-    camera.position.set(0, 2.6, 6.2);
+    camera.position.set(0, 3.6, 5.4);
+
+    // Em telas estreitas (celular) abre o campo de visão para o bolo caber inteiro
+    const ajustarFov = () => {
+      camera.fov = camera.aspect < 1 ? 55 : 40;
+      camera.updateProjectionMatrix();
+    };
+    ajustarFov();
 
     // --- CRIAÇÃO ULTRA DEFENSIVA DE RENDERER WEBGL PARA DISPOSITIVOS MÓVEIS ---
     let renderer = null;
@@ -436,418 +910,387 @@ function initApp() {
     let controls = null;
     if (typeof THREE.OrbitControls !== 'undefined') {
       controls = new THREE.OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = true;
       controls.dampingFactor = 0.05;
-      controls.maxPolarAngle = Math.PI / 2.1;
-      controls.minDistance = 3;
-      controls.maxDistance = 10;
-      controls.target.set(0, 0.8, 0);
-      controls.update();
+      // limites de zoom, ângulo e alvo são definidos por aplicarAmbienteConfeitaria()
     }
-
-    // Iluminação
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-    scene.add(ambientLight);
-
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
-    dirLight.position.set(5, 8, 5);
-    dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 1024;
-    dirLight.shadow.mapSize.height = 1024;
-    scene.add(dirLight);
-
-    const pointLight = new THREE.PointLight(0xffeedd, 0.4);
-    pointLight.position.set(-4, 3, -2);
-    scene.add(pointLight);
-
-    // Cenário (Mesa / Balcão)
-    const tableGroup = new THREE.Group();
-    const tableGeo = new THREE.CylinderGeometry(2.6, 2.7, 0.2, 48);
-    const tableMat = new THREE.MeshStandardMaterial({ color: 0xFFF8F0, roughness: 0.3 });
-    const table = new THREE.Mesh(tableGeo, tableMat);
-    table.position.y = -0.1;
-    table.receiveShadow = true;
-    tableGroup.add(table);
-
-    const plateGeo = new THREE.CylinderGeometry(1.6, 1.4, 0.08, 48);
-    const plateMat = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.2, metalness: 0.1 });
-    const plate = new THREE.Mesh(plateGeo, plateMat);
-    plate.position.y = 0.04;
-    plate.receiveShadow = true;
-    tableGroup.add(plate);
-    scene.add(tableGroup);
 
     // Grupo do Bolo
     const cakeGroup = new THREE.Group();
     scene.add(cakeGroup);
 
-    // Cores dos Ingredientes
-    const massaColors = {
+    // === AMBIENTE: salão + mesa retrô + bailarina de cristal + iluminação ===
+    const ambiente = aplicarAmbienteConfeitaria({
+      scene, renderer, camera, controls, cakeGroup
+    });
+
+    // Animação GSAP de entrada: a câmera desce suavemente até a posição final
+    if (typeof gsap !== 'undefined' && controls) {
+      const maxDistFinal = controls.maxDistance;
+      controls.maxDistance = 9; // folga só durante a animação
+      gsap.from(camera.position, {
+        y: 5.4,
+        z: 7.4,
+        duration: 2.2,
+        ease: 'power2.out',
+        onComplete: () => { controls.maxDistance = maxDistFinal; }
+      });
+    }
+
+    // Materiais
+    const massColors = {
       branca: 0xFFF9E6,
-      mista: 0xBA8B63,
-      chocolate: 0x4A2E1B,
+      mista: 0xD2B48C,
+      chocolate: 0x5C3A21,
       baunilha: 0xFFFDE8,
       amanteigada: 0xFFF3CD
     };
 
-    const recheioColors = {
-      none: 0x000000,
+    const fillingColors = {
+      none: 0xFFFFFF,
       brigadeiro: 0x3D2314,
-      brigadeiro_branco: 0xFFFDD0,
-      doce_de_leite: 0xC68642,
-      beijinho: 0xFFFAFA,
+      brigadeiro_branco: 0xFFFBE6,
+      doce_de_leite: 0xC68B59,
+      beijinho: 0xFFFDF0,
       morango: 0xE63946,
-      chocolate_amargo: 0x24140E,
-      ganache: 0x2C1609,
-      ninho: 0xFFFFF0,
-      limao: 0xD4E157,
-      maracuja: 0xFFB703,
-      ninho_morango: 0xE63946,
-      ninho_nutella: 0x3D2314,
-      brigadeiro_morango: 0x800F2F
+      chocolate_amargo: 0x2B1810,
+      ganache: 0x4A2E1B,
+      ninho: 0xFFFEEA,
+      limao: 0xE2F1AF,
+      maracuja: 0xFFD166,
+      ninho_morango: 0xF4A261,
+      ninho_nutella: 0x582F0E,
+      brigadeiro_morango: 0x7B2CBF
     };
 
-    const coberturaColors = {
-      none: null,
+    const frostingColors = {
       chantininho: 0xFFFFFF,
-      chocolate: 0x362012,
-      brigadeiro: 0x4A2E1B,
+      chocolate: 0x4A2E1B,
+      brigadeiro: 0x362012,
       ganache: 0x2B1810
     };
 
+    let topperMesh = null;
+
     function buildCake() {
-      // Limpa camadas anteriores
+      // Limpar bolo anterior
       while(cakeGroup.children.length > 0) {
         const obj = cakeGroup.children[0];
-        if (obj.geometry) obj.geometry.dispose();
-        if (obj.material) {
-          if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
-          else obj.material.dispose();
-        }
         cakeGroup.remove(obj);
+        if (obj.geometry) obj.geometry.dispose();
       }
 
-      const baseScale = Math.min(1.4, 0.85 + (state.tamanho * 0.055));
-      cakeGroup.scale.set(baseScale, baseScale, baseScale);
-
-      const mColor = massaColors[state.massa] || massaColors.branca;
-      const cakeMat = new THREE.MeshStandardMaterial({ color: mColor, roughness: 0.6 });
-
-      // Camadas do bolo (3 discos de massa)
-      const layers = 3;
+      const numFillings = state.tamanho >= 3 ? 2 : 1;
+      const baseRadius = 0.9 + Math.min(state.tamanho * 0.05, 0.4);
       const layerHeight = 0.22;
-      const cakeRadius = 1.1;
 
-      for (let i = 0; i < layers; i++) {
-        const cakeGeo = new THREE.CylinderGeometry(cakeRadius, cakeRadius, layerHeight, 48);
-        const layerMesh = new THREE.Mesh(cakeGeo, cakeMat);
-        layerMesh.position.y = 0.15 + (i * (layerHeight + 0.05));
-        layerMesh.castShadow = true;
-        layerMesh.receiveShadow = true;
-        cakeGroup.add(layerMesh);
+      let layerCount = 3;
+      let curY = 0.08 + layerHeight / 2;
 
-        // Recheios entre as camadas
-        if (i < layers - 1) {
-          const rKey = (i === 0) ? (state.recheio1 !== 'none' ? state.recheio1 : state.recheio2) : (state.recheio2 !== 'none' ? state.recheio2 : state.recheio1);
-          if (rKey && rKey !== 'none') {
-            const fillMat = new THREE.MeshStandardMaterial({ color: recheioColors[rKey] || 0xFFFDD0, roughness: 0.4 });
-            const fillGeo = new THREE.CylinderGeometry(cakeRadius - 0.02, cakeRadius - 0.02, 0.05, 48);
-            const fillMesh = new THREE.Mesh(fillGeo, fillMat);
-            fillMesh.position.y = layerMesh.position.y + (layerHeight / 2) + 0.025;
-            cakeGroup.add(fillMesh);
+      // Se houver cobertura completa
+      if (state.cobertura !== 'none') {
+        const totalHeight = layerCount * layerHeight + (numFillings * 0.08);
+        const coverGeo = new THREE.CylinderGeometry(baseRadius + 0.03, baseRadius + 0.03, totalHeight, 64);
+        const coverMat = new THREE.MeshStandardMaterial({
+          color: frostingColors[state.cobertura] || 0xFFFFFF,
+          roughness: 0.3,
+          metalness: 0.05
+        });
+        const coverMesh = new THREE.Mesh(coverGeo, coverMat);
+        coverMesh.position.y = 0.08 + totalHeight / 2;
+        coverMesh.castShadow = true;
+        coverMesh.receiveShadow = true;
+        cakeGroup.add(coverMesh);
+      } else {
+        // Bolo sem cobertura (Naked Cake com Camadas Visíveis)
+        for (let i = 0; i < layerCount; i++) {
+          const massaGeo = new THREE.CylinderGeometry(baseRadius, baseRadius, layerHeight, 48);
+          const massaMat = new THREE.MeshStandardMaterial({
+            color: massColors[state.massa] || 0xFFF9E6,
+            roughness: 0.7
+          });
+          const massaMesh = new THREE.Mesh(massaGeo, massaMat);
+          massaMesh.position.y = curY;
+          massaMesh.castShadow = true;
+          massaMesh.receiveShadow = true;
+          cakeGroup.add(massaMesh);
+
+          curY += layerHeight;
+
+          // Adicionar Recheio entre camadas
+          if (i < layerCount - 1) {
+            const currentFillingKey = (i === 0) ? state.recheio1 : (numFillings > 1 ? state.recheio2 : state.recheio1);
+            if (currentFillingKey !== 'none') {
+              const fillGeo = new THREE.CylinderGeometry(baseRadius - 0.02, baseRadius - 0.02, 0.08, 48);
+              const fillMat = new THREE.MeshStandardMaterial({
+                color: fillingColors[currentFillingKey] || 0xFFFFFF,
+                roughness: 0.4
+              });
+              const fillMesh = new THREE.Mesh(fillGeo, fillMat);
+              fillMesh.position.y = curY - (layerHeight / 2) + 0.04;
+              cakeGroup.add(fillMesh);
+              curY += 0.06;
+            }
           }
         }
       }
 
-      // Cobertura externa
-      if (state.cobertura !== 'none' && coberturaColors[state.cobertura]) {
-        const cobColor = coberturaColors[state.cobertura];
-        const cobMat = new THREE.MeshStandardMaterial({ color: cobColor, roughness: 0.35 });
-        const totalHeight = (layers * layerHeight) + ((layers - 1) * 0.05);
-        
-        // Cobertura total envelopando topo e toda a lateral externa das camadas
-        const cobGeo = new THREE.CylinderGeometry(cakeRadius + 0.06, cakeRadius + 0.06, totalHeight + 0.1, 48);
-        const cobMesh = new THREE.Mesh(cobGeo, cobMat);
-        cobMesh.position.y = 0.15 + (totalHeight / 2) - 0.01;
-        cobMesh.castShadow = true;
-        cobMesh.receiveShadow = true;
-        cakeGroup.add(cobMesh);
+      // Decoração Superior
+      const topY = 0.08 + (layerCount * layerHeight) + 0.02;
+
+      if (state.decoracao === 'morango') {
+        const strawberryGeo = new THREE.ConeGeometry(0.08, 0.16, 12);
+        const strawberryMat = new THREE.MeshStandardMaterial({ color: 0xE63946, roughness: 0.3 });
+        for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+          const sMesh = new THREE.Mesh(strawberryGeo, strawberryMat);
+          sMesh.position.set(Math.cos(a) * (baseRadius * 0.6), topY + 0.08, Math.sin(a) * (baseRadius * 0.6));
+          sMesh.rotation.z = Math.PI;
+          cakeGroup.add(sMesh);
+        }
       }
+
+      // Topper de Bolo com Texto/Tema Personalizado
+      if (topperMesh) cakeGroup.add(topperMesh);
     }
 
+    function createTopperMesh(text) {
+      const group = new THREE.Group();
+      
+      // Haste Dourada
+      const stickGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.9, 16);
+      const stickMat = new THREE.MeshStandardMaterial({ color: 0xE5A823, metalness: 0.8, roughness: 0.2 });
+      const stick = new THREE.Mesh(stickGeo, stickMat);
+      stick.position.y = 0.45;
+      group.add(stick);
+
+      // Placa com Texto
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#2B0C0E';
+      ctx.fillRect(0, 0, 512, 256);
+      ctx.strokeStyle = '#E5A823';
+      ctx.lineWidth = 12;
+      ctx.strokeRect(6, 6, 500, 244);
+
+      ctx.fillStyle = '#E5A823';
+      ctx.font = 'bold 44px Montserrat, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text || 'DeliciArte', 256, 128);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      const boardGeo = new THREE.PlaneGeometry(0.7, 0.35);
+      const boardMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
+      const board = new THREE.Mesh(boardGeo, boardMat);
+      board.position.y = 0.8;
+      group.add(board);
+
+      const topY = 0.08 + (3 * 0.22);
+      group.position.y = topY;
+      return group;
+    }
+
+    // Reconstrói o bolo e reposiciona sobre a bailarina (prato acompanha o tamanho)
     function updateCake() {
       buildCake();
-      if (controls) controls.update();
+      ambiente.sincronizarBolo();
     }
 
-    // Eventos da Interface
-    const btnMassaBranca = document.getElementById('btn-massa-branca');
-    const btnMassaMista = document.getElementById('btn-massa-mista');
-    const btnMassaChocolate = document.getElementById('btn-massa-chocolate');
-    const btnMassaBaunilha = document.getElementById('btn-massa-baunilha');
-    const btnMassaAmanteigada = document.getElementById('btn-massa-amanteigada');
+    // Ligação tolerante: se o elemento foi removido do HTML, simplesmente ignora
+    const on = (id, ev, fn) => { const el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
 
-    function setActiveMassaBtn(activeBtn) {
-      [btnMassaBranca, btnMassaMista, btnMassaChocolate, btnMassaBaunilha, btnMassaAmanteigada].forEach(btn => {
-        if (btn) btn.classList.remove('btn-active');
-      });
-      if (activeBtn) activeBtn.classList.add('btn-active');
-    }
+    // Eventos dos Controles
+    on('sizeInput', 'input', (e) => {
+      let val = parseFloat(e.target.value) || 1;
+      state.tamanho = val;
+      const badge = document.getElementById('recheioBadge');
+      const singleContainer = document.getElementById('singleFillingContainer');
+      const doubleContainer = document.getElementById('doubleFillingContainer');
 
-    if (btnMassaBranca) btnMassaBranca.addEventListener('click', () => { state.massa = 'branca'; setActiveMassaBtn(btnMassaBranca); updateCake(); });
-    if (btnMassaMista) btnMassaMista.addEventListener('click', () => { state.massa = 'mista'; setActiveMassaBtn(btnMassaMista); updateCake(); });
-    if (btnMassaChocolate) btnMassaChocolate.addEventListener('click', () => { state.massa = 'chocolate'; setActiveMassaBtn(btnMassaChocolate); updateCake(); });
-    if (btnMassaBaunilha) btnMassaBaunilha.addEventListener('click', () => { state.massa = 'baunilha'; setActiveMassaBtn(btnMassaBaunilha); updateCake(); });
-    if (btnMassaAmanteigada) btnMassaAmanteigada.addEventListener('click', () => { state.massa = 'amanteigada'; setActiveMassaBtn(btnMassaAmanteigada); updateCake(); });
-
-    setActiveMassaBtn(btnMassaBranca);
-
-    // Adiciona listener para alteração de cobertura
-    const coberturaSelect = document.getElementById('coberturaSelect');
-    if (coberturaSelect) {
-      coberturaSelect.addEventListener('change', (e) => {
-        state.cobertura = e.target.value;
-        updateCake();
-      });
-    }
-
-    const sizeInput = document.getElementById('sizeInput');
-    const singleFillingContainer = document.getElementById('singleFillingContainer');
-    const doubleFillingContainer = document.getElementById('doubleFillingContainer');
-    const recheioBadge = document.getElementById('recheioBadge');
-    const selectRecheio1 = document.getElementById('selectRecheio1');
-    const selectRecheio2 = document.getElementById('selectRecheio2');
-
-    function checkFillingMode() {
-      if (state.tamanho >= 3) {
-        if (singleFillingContainer) singleFillingContainer.classList.add('hidden');
-        if (doubleFillingContainer) doubleFillingContainer.classList.remove('hidden');
-        if (recheioBadge) recheioBadge.innerText = 'Até 2 Recheios (3kg+)';
+      if (val >= 3) {
+        if (badge) badge.innerText = '2 Recheios';
+        if (singleContainer) singleContainer.classList.add('hidden');
+        if (doubleContainer) doubleContainer.classList.remove('hidden');
       } else {
-        if (singleFillingContainer) singleFillingContainer.classList.remove('hidden');
-        if (doubleFillingContainer) doubleFillingContainer.classList.add('hidden');
-        if (recheioBadge) recheioBadge.innerText = '1 Recheio (<3kg)';
+        if (badge) badge.innerText = '1 Recheio';
+        if (singleContainer) singleContainer.classList.remove('hidden');
+        if (doubleContainer) doubleContainer.classList.add('hidden');
       }
-    }
+      updateCake();
+    });
 
-    if (sizeInput) {
-      sizeInput.addEventListener('input', (e) => {
-        state.tamanho = parseFloat(e.target.value) || 1;
-        checkFillingMode();
-        updateCake();
-      });
-    }
+    ['branca', 'mista', 'chocolate', 'baunilha', 'amanteigada'].forEach(massa => {
+      const btn = document.getElementById(`btn-massa-${massa}`);
+      if (btn) {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('[id^="btn-massa-"]').forEach(b => b.classList.remove('btn-active'));
+          btn.classList.add('btn-active');
+          state.massa = massa;
+          updateCake();
+        });
+      }
+    });
 
-    if (singleRecheioSelect) {
-      singleRecheioSelect.addEventListener('change', (e) => {
-        state.recheio1 = e.target.value;
-        state.recheio2 = 'none';
-        updateCake();
-      });
-    }
+    on('singleRecheioSelect', 'change', (e) => {
+      state.recheio1 = e.target.value;
+      updateCake();
+    });
 
-    if (selectRecheio1) {
-      selectRecheio1.addEventListener('change', (e) => {
-        state.recheio1 = e.target.value;
-        updateCake();
-      });
-    }
+    on('selectRecheio1', 'change', (e) => {
+      state.recheio1 = e.target.value;
+      updateCake();
+    });
 
-    if (selectRecheio2) {
-      selectRecheio2.addEventListener('change', (e) => {
-        state.recheio2 = e.target.value;
-        updateCake();
-      });
-    }
+    on('selectRecheio2', 'change', (e) => {
+      state.recheio2 = e.target.value;
+      updateCake();
+    });
 
-    // Modal e Envio do Pedido
-    const btnFinalizar = document.getElementById('btn-finalizar');
+    on('coberturaSelect', 'change', (e) => {
+      state.cobertura = e.target.value;
+      updateCake();
+    });
+
+    on('decoracaoSelect', 'change', (e) => {
+      state.decoracao = e.target.value;
+      updateCake();
+    });
+
+    on('btnGerarTopper', 'click', () => {
+      const val = (document.getElementById('inputTemaTopper')?.value || '').trim();
+      if (val) {
+        topperMesh = createTopperMesh(val);
+      } else {
+        topperMesh = null;
+      }
+      updateCake();
+    });
+
+    // Modal de Finalização e WhatsApp
     const orderModal = document.getElementById('orderModal');
-    const orderStepSummary = document.getElementById('orderStepSummary');
-    const orderStepForm = document.getElementById('orderStepForm');
-    const modalSummaryText = document.getElementById('modalSummaryText');
-    const btnCloseModal = document.getElementById('btn-close-modal');
-    const btnConfirmOrder = document.getElementById('btn-confirm-order');
-    const btnBackToSummary = document.getElementById('btn-back-to-summary');
-    const deliveryForm = document.getElementById('deliveryForm');
+    const stepSummary = document.getElementById('orderStepSummary');
+    const stepForm = document.getElementById('orderStepForm');
 
-    if (btnFinalizar && orderModal && modalSummaryText) {
-      btnFinalizar.addEventListener('click', () => {
-        const massaNome = state.massa.toUpperCase();
-        let recheioNome = 'Nenhum';
+    on('btn-finalizar', 'click', () => {
+      let recheioTxt = state.tamanho >= 3 ? `${state.recheio1} & ${state.recheio2}` : state.recheio1;
+      const html = `
+        <p><strong>⚖️ Tamanho:</strong> ${state.tamanho} kg</p>
+        <p><strong>🧁 Massa:</strong> ${state.massa.toUpperCase()}</p>
+        <p><strong>🍫 Recheio:</strong> ${recheioTxt}</p>
+        <p><strong>✨ Cobertura:</strong> ${state.cobertura}</p>
+        ${document.getElementById('decoracaoSelect') ? `<p><strong>🎨 Decoração:</strong> ${state.decoracao}</p>` : ''}
+      `;
+      document.getElementById('modalSummaryText').innerHTML = html;
+      stepSummary.classList.remove('hidden');
+      stepForm.classList.add('hidden');
+      orderModal.classList.remove('opacity-0', 'pointer-events-none');
+    });
 
-        if (state.tamanho >= 3) {
-          const r1 = selectRecheio1 && selectRecheio1.value !== 'none' ? selectRecheio1.options[selectRecheio1.selectedIndex].text : '';
-          const r2 = selectRecheio2 && selectRecheio2.value !== 'none' ? selectRecheio2.options[selectRecheio2.selectedIndex].text : '';
-          if (r1 && r2) recheioNome = `${r1} & ${r2}`;
-          else if (r1) recheioNome = r1;
-          else if (r2) recheioNome = r2;
-        } else {
-          recheioNome = singleRecheioSelect ? singleRecheioSelect.options[singleRecheioSelect.selectedIndex].text : 'Nenhum';
-        }
+    on('btn-close-modal', 'click', () => {
+      orderModal.classList.add('opacity-0', 'pointer-events-none');
+    });
 
-        const cobNome = coberturaSelect ? coberturaSelect.options[coberturaSelect.selectedIndex].text : 'Nenhuma';
-        const decNome = decoracaoSelect ? decoracaoSelect.options[decoracaoSelect.selectedIndex].text : 'Nenhuma';
-        const temaVal = inputTemaTopper ? inputTemaTopper.value.trim() : '';
+    on('btn-confirm-order', 'click', () => {
+      stepSummary.classList.add('hidden');
+      stepForm.classList.remove('hidden');
+    });
 
-        modalSummaryText.innerHTML = `
-          <p><strong>Tamanho:</strong> ${state.tamanho} KG</p>
-          <p><strong>Massa:</strong> ${massaNome}</p>
-          <p><strong>Recheio(s):</strong> ${recheioNome}</p>
-          <p><strong>Cobertura:</strong> ${cobNome}</p>
-          <p><strong>Decoração:</strong> ${decNome}</p>
-          ${temaVal ? `<p><strong>Tema do Topo:</strong> ${temaVal}</p>` : ''}
-        `;
+    on('btn-back-to-summary', 'click', () => {
+      stepForm.classList.add('hidden');
+      stepSummary.classList.remove('hidden');
+    });
 
-        if (orderStepSummary) orderStepSummary.classList.remove('hidden');
-        if (orderStepForm) orderStepForm.classList.add('hidden');
-        orderModal.classList.remove('opacity-0', 'pointer-events-none');
-      });
+    on('deliveryForm', 'submit', (e) => {
+      e.preventDefault();
+      
+      const name = document.getElementById('custName').value.trim();
+      const phoneInput = document.getElementById('custPhone').value.trim();
+      const dateVal = document.getElementById('deliveryDate').value;
+      const timeVal = document.getElementById('deliveryTime').value;
+      const address = document.getElementById('custAddress').value.trim();
+
+      let formattedDate = dateVal;
+      if (dateVal.includes('-')) {
+        const parts = dateVal.split('-');
+        formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      }
+
+      let cleanDigits = phoneInput.replace(/\D/g, '');
+      if (cleanDigits.length === 10 || cleanDigits.length === 11) {
+        cleanDigits = '55' + cleanDigits;
+      }
+      const targetPhone = cleanDigits.length >= 12 ? cleanDigits : '5583988558021';
+
+      let recheioTxt = state.tamanho >= 3 ? `${state.recheio1} & ${state.recheio2}` : state.recheio1;
+      const topperTema = (document.getElementById('inputTemaTopper')?.value || '').trim() || 'Nenhum';
+
+      const temDecoracao = !!document.getElementById('decoracaoSelect');
+      const temTopper = !!document.getElementById('inputTemaTopper');
+      const extraDecoracao = (temDecoracao ? `\n🎨 Decoração: ${state.decoracao}` : '') + (temTopper ? `\n🏷️ Tema Topo: ${topperTema}` : '');
+
+      const messageText = 
+`🎂 NOVO PEDIDO - DELICIARTE DA JANINHA
+
+👤 CLIENTE: ${name}
+📞 CONTATO: ${phoneInput}
+📅 DATA DE ENTREGA: ${formattedDate}
+⏰ HORÁRIO: ${timeVal}
+📍 ENDEREÇO/RETIRADA: ${address}
+
+--- DETALHES DO BOLO ---
+⚖️ Tamanho: ${state.tamanho} kg
+🧁 Massa: ${state.massa.toUpperCase()}
+🍫 Recheio(s): ${recheioTxt}
+✨ Cobertura: ${state.cobertura}${extraDecoracao}`;
+
+      const whatsappUrl = `https://wa.me/${targetPhone}?text=${encodeURIComponent(messageText)}`;
+      window.location.href = whatsappUrl;
+    });
+
+    // Render loop
+    buildCake();
+    ambiente.sincronizarBolo(); // coloca o bolo sobre a bailarina na primeira carga
+    if (loader) loader.style.opacity = '0';
+    setTimeout(() => { if (loader) loader.style.display = 'none'; }, 500);
+    if (hint) {
+      hint.classList.remove('opacity-0');
+      setTimeout(() => hint.classList.add('opacity-0'), 4000);
     }
 
-    if (btnCloseModal && orderModal) {
-      btnCloseModal.addEventListener('click', () => {
-        orderModal.classList.add('opacity-0', 'pointer-events-none');
-      });
-    }
-
-    if (btnConfirmOrder && orderStepSummary && orderStepForm) {
-      btnConfirmOrder.addEventListener('click', () => {
-        orderStepSummary.classList.add('hidden');
-        orderStepForm.classList.remove('hidden');
-      });
-    }
-
-    if (btnBackToSummary && orderStepSummary && orderStepForm) {
-      btnBackToSummary.addEventListener('click', () => {
-        orderStepForm.classList.add('hidden');
-        orderStepSummary.classList.remove('hidden');
-      });
-    }
-
-    if (deliveryForm) {
-      deliveryForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-
-        const name = document.getElementById('custName').value.trim();
-        const phone = document.getElementById('custPhone').value.trim();
-        const dateRaw = document.getElementById('deliveryDate').value;
-        const time = document.getElementById('deliveryTime').value;
-        const address = document.getElementById('custAddress').value.trim();
-
-        // Formatar data para DD/MM/AAAA
-        let dateFormatted = dateRaw;
-        if (dateRaw && dateRaw.includes('-')) {
-          const parts = dateRaw.split('-');
-          dateFormatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
-        }
-
-        const massaNome = state.massa.toUpperCase();
-        let recheioNome = 'Nenhum';
-        if (state.tamanho >= 3) {
-          const r1 = selectRecheio1 && selectRecheio1.value !== 'none' ? selectRecheio1.options[selectRecheio1.selectedIndex].text : '';
-          const r2 = selectRecheio2 && selectRecheio2.value !== 'none' ? selectRecheio2.options[selectRecheio2.selectedIndex].text : '';
-          if (r1 && r2) recheioNome = `${r1} & ${r2}`;
-          else if (r1) recheioNome = r1;
-          else if (r2) recheioNome = r2;
-        } else {
-          recheioNome = singleRecheioSelect ? singleRecheioSelect.options[singleRecheioSelect.selectedIndex].text : 'Nenhum';
-        }
-
-        const cobNome = coberturaSelect ? coberturaSelect.options[coberturaSelect.selectedIndex].text : 'Nenhuma';
-        const decNome = decoracaoSelect ? decoracaoSelect.options[decoracaoSelect.selectedIndex].text : 'Nenhuma';
-        const temaVal = inputTemaTopper ? inputTemaTopper.value.trim() : 'Nenhum';
-
-        const messageText = 
-`🎂 *NOVO PEDIDO - DELICIARTE DA JANINHA*
-
-👤 *CLIENTE:* ${name}
-📞 *CONTATO:* ${phone}
-📅 *DATA DE ENTREGA:* ${dateFormatted}
-⏰ *HORÁRIO:* ${time}
-📍 *ENDEREÇO/RETIRADA:* ${address}
-
---- *DETALHES DO BOLO* ---
-⚖️ *Tamanho:* ${state.tamanho} kg
-🧁 *Massa:* ${massaNome}
-🍫 *Recheio(s):* ${recheioNome}
-✨ *Cobertura:* ${cobNome}
-🎨 *Decoração:* ${decNome}
-🏷️ *Tema do Topo:* ${temaVal}`;
-
-        // Trata o número digitado pelo cliente (remove caracteres não numéricos)
-        let cleanPhone = phone.replace(/\D/g, '');
-        
-        // Se for um número brasileiro padrão (ex: 83991438527 - 10 ou 11 dígitos), adiciona o DDI 55
-        if (cleanPhone.length === 10 || cleanPhone.length === 11) {
-          cleanPhone = '55' + cleanPhone;
-        }
-
-        // Se o número limpo for válido (com 12 ou 13 dígitos incluindo 55), usa ele; caso contrário, usa o padrão da loja
-        const targetPhone = (cleanPhone.length >= 12 && cleanPhone.length <= 13) ? cleanPhone : '5583988558021';
-
-        const whatsappUrl = `https://wa.me/${targetPhone}?text=${encodeURIComponent(messageText)}`;
-        
-        // Abre diretamente o WhatsApp sem ser bloqueado por pop-ups no celular
-        window.location.href = whatsappUrl;
-      });
-    }
-
-    // Inicialização da Renderização e Loop
     function animate() {
       requestAnimationFrame(animate);
       if (controls) controls.update();
-      if (renderer && scene && camera) {
-        renderer.render(scene, camera);
-      }
+      renderer.render(scene, camera);
     }
-    
-    // Inicia a animação 3D
     animate();
 
-    // Esconde o loader e exibe a dica
-    if (loader) loader.style.display = 'none';
-    if (hint) {
-      hint.style.opacity = '1';
-      setTimeout(() => {
-        hint.style.opacity = '0';
-      }, 3500);
-    }
-
-    // Renderiza a cobertura e o estado inicial do bolo
-    buildCake();
-
-    // Redimensionamento responsivo da tela
     window.addEventListener('resize', () => {
-      const w = container.clientWidth || (window.innerWidth * 0.66);
-      const h = container.clientHeight || window.innerHeight;
-      if (w > 0 && h > 0 && renderer && camera) {
-        renderer.setSize(w, h);
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-      }
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      camera.aspect = w / h;
+      ajustarFov();
+      renderer.setSize(w, h);
     });
 
   } catch (err) {
     console.error('❌ Erro na inicialização 3D:', err);
     if (loader) {
       loader.innerHTML = `
-        <div class="p-4 bg-amber-50 border border-amber-300 rounded-2xl text-center max-w-xs mx-auto shadow-lg">
-          <p class="text-xs font-bold text-[#2b0c0e] mb-2">Modo de Compatibilidade</p>
-          <p class="text-[11px] text-gray-600 mb-3">Seu navegador restringiu a aceleração WebGL 3D, mas você ainda pode personalizar seu pedido normalmente!</p>
-          <button onclick="location.reload()" class="px-4 py-2 bg-[#e5a823] text-[#2b0c0e] font-bold text-xs rounded-xl shadow">Tentar Novamente</button>
+        <div class="p-4 bg-amber-50 rounded-2xl border border-amber-300 text-center max-w-xs mx-auto">
+          <div class="text-3xl mb-2">🍰</div>
+          <h4 class="font-bold text-sm text-[#2b0c0e] mb-1">Modo de Compatibilidade</h4>
+          <p class="text-xs text-gray-600 mb-3">Seu navegador restringiu a aceleração WebGL 3D, mas você ainda pode personalizar seu pedido!</p>
+          <button onclick="location.reload()" class="px-4 py-2 bg-[#2b0c0e] text-[#e5a823] text-xs font-bold rounded-xl shadow">Tentar Novamente</button>
         </div>
       `;
     }
   }
 }
 
-// Inicialização segura após o carregamento da página
-if (document.readyState === 'complete' || document.readyState === 'interactive') {
-  setTimeout(initApp, 50);
-} else {
-  document.addEventListener('DOMContentLoaded', initApp);
-}
+window.onload = function() {
+  initApp();
+};
 </script>
 </body>
 </html>
